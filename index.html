@@ -90,7 +90,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .block:not([open])>summary{border-bottom:0}
 .block>summary::before{content:"";width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);margin-right:2px;align-self:center;transition:transform .15s}
 .block[open]>summary::before{transform:rotate(45deg)}
-.scroll{overflow-x:auto}
+.scroll{overflow-x:auto;padding-bottom:14px}
+/* La barre de défilement horizontale se place dans cette marge au lieu de cacher la dernière ligne */
 
 table.fc{border-collapse:collapse;table-layout:fixed;font:500 13px/1 var(--f-data);font-variant-numeric:tabular-nums}
 table.fc th,table.fc td{padding:0;text-align:center;height:24px;border-bottom:1px solid var(--line)}
