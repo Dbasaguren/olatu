@@ -1,0 +1,10 @@
+Recalcul des constantes de marée d'Olatu (à refaire environ une fois par an)
+
+1. python telecharger_maregraphe.py socoa_hourly.json 95      (Socoa ; 3 = Brest)
+   (télécharge les années 2000 à 2026 : modifier range() dans le script pour d'autres années)
+2. python analyse_harmonique.py socoa_hourly.json socoa_constants.json
+   -> affiche la validation sur 2025-2026 et écrit les constantes
+3. python recaler_niveau_moyen.py socoa_hourly.json socoa_constants.json
+4. Copier z0, trend et cons dans la constante TIDE de index.html
+
+Données : REFMAR / Shom, Licence Ouverte 2.0 (doi:10.17183/REFMAR). Nécessite numpy.

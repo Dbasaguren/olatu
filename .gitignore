@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+*.json.bak
+socoa_hourly.json
+brest_hourly.json
