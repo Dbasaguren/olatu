@@ -727,7 +727,10 @@ function render(spot, data){
   }).join("")}`;
 
   const gap = `<tr class="gap"><th class="lab"></th><td colspan="${cols.length}"></td></tr>`;
+  // Pas de note tant que tu n'as noté aucune session sur ce spot
+  const spotSess = state.sessions.filter(x=>x.spot===spot.id && x.f).length;
   const noteCell = c => {
+    if(!spotSess) return td(c, "–", "dim", ` title="Note une session sur ce spot pour voir ta note"`);
     if(!c.score) return td(c, "–", "dim");
     const v = c.score.v, perso = c.score.w >= 0.3;
     const tip = `Note ${v.toFixed(1)}/10` + (perso ? ` · ajustée par ${c.score.n} de tes sessions (note de base ${c.score.base.toFixed(1)})` : " · note de base");
@@ -735,7 +738,7 @@ function render(spot, data){
   };
 
   const R = {
-    note:     `${lab("Note", mySess.length ? "/10 · • = perso" : "/10")}${cols.map(noteCell).join("")}`,
+    note:     `${lab("Note", spotSess ? "/10 · • = perso" : "/10 · aucune session")}${cols.map(noteCell).join("")}`,
     houle:    `${lab("Hauteur","m")}${cols.map(c=>td(c, fmt(c.hs,1), "", bg("wave",c.hs))).join("")}`,
     periode:  `${lab("Période","s")}${cols.map(c=>td(c, fmt(c.per), "", bg("period",c.per))).join("")}`,
     dirhoule: `${lab("Direction")}${cols.map(c=>td(c, arrow(c.dir, c.dir==null?"":`Houle de ${card(c.dir)} (${Math.round(c.dir)}°)`), "dirc")).join("")}`,
