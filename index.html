@@ -200,6 +200,8 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .sitem .del{border:0;background:none;color:var(--muted);font-size:12px;text-decoration:underline;padding:4px}
 .sitem .del:hover{color:var(--on-ink)}
 .sempty{color:var(--muted);font-size:13.5px;padding:6px 0}
+/* Espace entre la synthèse et les blocs détaillés */
+.block.synth{margin-bottom:36px}
 /* Bichomètre */
 td.bicho{height:auto;padding:5px 4px;font:500 12px/1.2 var(--f-ui);white-space:normal}
 td.bicho .bb1{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--g-fun);color:#fff;font-weight:700;animation:bb1 1.6s ease-in-out infinite}
@@ -823,7 +825,7 @@ function render(spot, data){
       rows.map(([id])=>`<tr class="g-${g.id}">${R[id]}</tr>`).join("");
   }).join("");
   const synth = `
-  <div class="block"><div class="bt"><span class="bt-name">Synthèse surf</span><span class="bt-info">Houle MFWAM · vent AROME → ARPEGE → ECMWF · marée Socoa · coef Brest</span></div>
+  <div class="block synth"><div class="bt"><span class="bt-name">Synthèse surf</span><span class="bt-info">Houle MFWAM · vent AROME → ARPEGE → ECMWF · marée Socoa · coef Brest</span></div>
   <div class="scroll"><table class="fc" style="width:${tblW}px">${colgroup}<thead>${header()}</thead><tbody>${body || `<tr><td colspan="${cols.length+1}" class="msg">Toutes les lignes sont masquées. Ouvre « Personnaliser » pour en réafficher.</td></tr>`}</tbody></table></div></div>`;
 
   // Comparaison des modèles de houle
