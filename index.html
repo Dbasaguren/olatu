@@ -110,7 +110,7 @@ td.dirc{cursor:pointer}
 td.dirc:hover{outline:1px solid var(--line-strong);outline-offset:-1px}
 .deg{display:block;font-weight:600;font-size:12.5px;line-height:1}
 .deg .sub{font-weight:500;font-size:9.5px;margin-top:1px}
-td.off{background:var(--off);color:var(--off-ink)} td.cross{background:var(--cross)} td.on{background:var(--on);color:var(--on-ink)}
+td.off,td.sw-good{background:var(--off);color:var(--off-ink)} td.cross,td.sw-ok{background:var(--cross)} td.on,td.sw-bad{background:var(--on);color:var(--on-ink)}
 td.tide{height:62px;vertical-align:top}
 td.tide svg{display:block}
 td.tide text{font:600 10px var(--f-data);fill:var(--ink)}
@@ -580,6 +580,21 @@ function windRel(dir, face){
   return d<=45 ? "on" : d>=135 ? "off" : "cross";
 }
 const REL_TXT = {off:"offshore", cross:"side-shore", on:"onshore"};
+// Direction de houle idéale par spot (provenance, en degrés) et tolérance [bonne, moyenne].
+// Les spots abrités (baie de Saint-Jean-de-Luz, Hendaye) ont une fenêtre plus étroite.
+const SWELL = {
+  barre:[295], cavaliers:[295], sablesdor:[295], grandeplage:[300], cotebasques:[290],
+  ilbarritz:[300], pavillon:[300], erretegia:[300], centmarches:[300],
+  parlementia:[300], alcyons:[290], avalanche:[300], cenitz:[300],
+  mayarco:[300], lafitenia:[305], gauchelafit:[300], erromardie:[315],
+  saintebarbe:[320,[15,35]], bougie:[315,[15,35]], belharra:[305],
+  deuxjumeaux:[320,[15,35]], hendaye:[320,[15,35]],
+};
+function swellFit(dir, spot){
+  const [best, win] = SWELL[spot.id] || [spot.face], [good, ok] = win || [20, 45];
+  const d = angDiff(dir, best);
+  return {cls: d<=good ? "sw-good" : d<=ok ? "sw-ok" : "sw-bad", txt: d<=good ? "bonne direction" : d<=ok ? "direction moyenne" : "mauvaise direction", best};
+}
 
 // ---------- Note /10 ----------
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
@@ -772,7 +787,11 @@ function render(spot, data){
     note:     `${lab("Note", spotSess ? "/10 · • = perso" : "/10 · aucune session")}${cols.map(noteCell).join("")}`,
     houle:    `${lab("Hauteur","m")}${cols.map(c=>td(c, fmt(c.hs,1), "", bg("wave",c.hs))).join("")}`,
     periode:  `${lab("Période","s")}${cols.map(c=>td(c, fmt(c.per), "", bg("period",c.per))).join("")}`,
-    dirhoule: `${lab("Direction")}${cols.map(c=>td(c, arrow(c.dir, c.dir==null?"":`Houle de ${card(c.dir)} (${Math.round(c.dir)}°)`), "dirc")).join("")}`,
+    dirhoule: `${lab("Direction","selon le spot")}${cols.map(c=>{
+      if(c.dir==null) return td(c, "–", "dim");
+      const fit = swellFit(c.dir, spot);
+      return td(c, arrow(c.dir, `Houle de ${card(c.dir)} (${Math.round(c.dir)}°), ${fit.txt} pour ce spot (idéale : ${card(fit.best)}, ${fit.best}°)`), "dirc "+fit.cls);
+    }).join("")}`,
     energie:  `${lab("Énergie","kJ")}${cols.map(c=>td(c, fmt(c.e), "", bg("energy",c.e))).join("")}`,
     vent:     `${lab("Vent","nœuds")}${cols.map(c=>td(c, fmt(c.ws), "", bg("wind",c.ws))).join("")}`,
     rafales:  `${lab("Rafales","nœuds")}${cols.map(c=>td(c, fmt(c.wg), "", bg("wind",c.wg))).join("")}`,
@@ -843,7 +862,8 @@ function renderLegend(){
     sw("Période","period",[8,10,11,12,13,14,15,16,18,20],"s") +
     sw("Énergie","energy",[25,50,100,200,300,500,800,1200,2000],"kJ") +
     sw("Vent","wind",[5,7,9,11,13,15,17,19,21,25,30],"nœuds") +
-    `<div class="lg"><h3>Vent par rapport à la plage</h3><div class="rel"><span class="off-l" style="background:var(--off);color:var(--off-ink)">offshore · de terre</span><span style="background:var(--cross)">side-shore</span><span style="background:var(--on);color:var(--on-ink)">onshore · de mer</span></div></div>`;
+    `<div class="lg"><h3>Vent par rapport à la plage</h3><div class="rel"><span class="off-l" style="background:var(--off);color:var(--off-ink)">offshore · de terre</span><span style="background:var(--cross)">side-shore</span><span style="background:var(--on);color:var(--on-ink)">onshore · de mer</span></div></div>` +
+    `<div class="lg"><h3>Direction de la houle pour le spot</h3><div class="rel"><span style="background:var(--off);color:var(--off-ink)">bonne</span><span style="background:var(--cross)">moyenne</span><span style="background:var(--on);color:var(--on-ink)">mauvaise</span></div></div>`;
 }
 
 // ---------- Interface ----------
