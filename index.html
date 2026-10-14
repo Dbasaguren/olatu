@@ -199,6 +199,19 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .sitem .del{border:0;background:none;color:var(--muted);font-size:12px;text-decoration:underline;padding:4px}
 .sitem .del:hover{color:var(--on-ink)}
 .sempty{color:var(--muted);font-size:13.5px;padding:6px 0}
+/* Spots favoris */
+.spot.notfav{border-style:dashed}
+.spot.allspots{background:none;border-style:dashed;color:var(--accent)}
+.spot.allspots small{color:var(--muted)}
+.sp-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 22px}
+.sp-town h4{margin:0 0 4px;font:600 11.5px var(--f-ui);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.sp-row{display:flex;align-items:center;gap:4px;border-radius:6px}
+.sp-row.cur{background:var(--accent-soft)}
+.sp-star{border:0;background:none;font-size:20px;line-height:1;width:34px;height:34px;color:var(--line-strong);flex:0 0 auto}
+.sp-star[aria-pressed="true"]{color:var(--star)}
+.sp-go{border:0;background:none;text-align:left;font-size:15px;font-weight:600;padding:6px 4px;flex:1}
+.sp-go:hover{color:var(--accent)}
+.sp-go em{font-style:normal;font-weight:500;font-size:11px;color:var(--muted);margin-left:4px}
 /* Compte */
 .acc-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
 .linkbtn{border:0;background:none;color:var(--muted);text-decoration:underline;font-size:13px;padding:4px}
@@ -323,6 +336,14 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
   <div class="pd-foot"><button class="btn danger" type="button" id="delProf">Supprimer ce profil</button><button class="btn" type="button" id="resetProf">Tout réafficher</button></div>
 </dialog>
 
+<dialog class="prefs" id="spotsDlg" aria-labelledby="spTitle">
+  <div class="pd-head"><h2 id="spTitle">Mes spots</h2><button class="btn" type="button" data-close>Fermer</button></div>
+  <div class="pd-body">
+    <p class="pd-hint">Touche ★ pour mettre un spot en favori : il apparaît en haut de l'écran. Touche le nom d'un spot pour voir ses prévisions.</p>
+    <div class="sp-list" id="spotPick"></div>
+  </div>
+</dialog>
+
 <dialog class="prefs" id="sessDlg" aria-labelledby="sdTitle">
   <div class="pd-head"><h2 id="sdTitle">Noter une session</h2><button class="btn" type="button" data-close>Fermer</button></div>
   <div class="pd-body">
@@ -356,18 +377,28 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 "use strict";
 // ---------- Spots (orientation = direction vers laquelle la plage fait face, en degrés) ----------
 const SPOTS = [
-  {id:"barre",      town:"Anglet",            name:"La Barre",          lat:43.527, lon:-1.524, face:290},
-  {id:"cavaliers",  town:"Anglet",            name:"Les Cavaliers",     lat:43.516, lon:-1.530, face:290},
-  {id:"sablesdor",  town:"Anglet",            name:"Sables d'Or",       lat:43.498, lon:-1.545, face:295},
-  {id:"grandeplage",town:"Biarritz",          name:"Grande Plage",      lat:43.484, lon:-1.559, face:315},
-  {id:"cotebasques",town:"Biarritz",          name:"Côte des Basques",  lat:43.477, lon:-1.568, face:280},
-  {id:"ilbarritz",  town:"Bidart",            name:"Ilbarritz",         lat:43.455, lon:-1.578, face:300},
-  {id:"erretegia",  town:"Bidart",            name:"Erretegia",         lat:43.445, lon:-1.588, face:305},
-  {id:"parlementia",town:"Guéthary",          name:"Parlementia",       lat:43.428, lon:-1.613, face:310, reef:true},
-  {id:"lafitenia",  town:"Saint-Jean-de-Luz", name:"Lafitenia",         lat:43.415, lon:-1.627, face:320},
-  {id:"erromardie", town:"Saint-Jean-de-Luz", name:"Erromardie",        lat:43.403, lon:-1.643, face:330},
-  {id:"belharra",   town:"Urrugne",           name:"Belharra",          lat:43.405, lon:-1.665, face:315, big:true},
-  {id:"hendaye",    town:"Hendaye",           name:"Grande Plage",      lat:43.375, lon:-1.772, face:345},
+  {id:"barre",       town:"Anglet",            name:"La Barre",          lat:43.527, lon:-1.524, face:290},
+  {id:"cavaliers",   town:"Anglet",            name:"Les Cavaliers",     lat:43.516, lon:-1.530, face:290},
+  {id:"sablesdor",   town:"Anglet",            name:"Sables d'Or",       lat:43.498, lon:-1.545, face:295},
+  {id:"grandeplage", town:"Biarritz",          name:"Grande Plage",      lat:43.484, lon:-1.559, face:315},
+  {id:"cotebasques", town:"Biarritz",          name:"Côte des Basques",  lat:43.477, lon:-1.568, face:280},
+  {id:"ilbarritz",   town:"Bidart",            name:"Ilbarritz",         lat:43.455, lon:-1.578, face:300},
+  {id:"pavillon",    town:"Bidart",            name:"Pavillon Royal",    lat:43.451, lon:-1.581, face:300},
+  {id:"erretegia",   town:"Bidart",            name:"Erretegia",         lat:43.445, lon:-1.588, face:305},
+  {id:"centmarches", town:"Bidart",            name:"100 Marches",       lat:43.440, lon:-1.594, face:305},
+  {id:"parlementia", town:"Guéthary",          name:"Parlementia",       lat:43.428, lon:-1.611, face:310, reef:true},
+  {id:"alcyons",     town:"Guéthary",          name:"Les Alcyons",       lat:43.426, lon:-1.615, face:305, reef:true},
+  {id:"avalanche",   town:"Guéthary",          name:"Avalanche",         lat:43.430, lon:-1.622, face:310, big:true},
+  {id:"cenitz",      town:"Guéthary",          name:"Cenitz",            lat:43.423, lon:-1.619, face:320},
+  {id:"mayarco",     town:"Saint-Jean-de-Luz", name:"Mayarco",           lat:43.418, lon:-1.626, face:320},
+  {id:"lafitenia",   town:"Saint-Jean-de-Luz", name:"Lafitenia",         lat:43.415, lon:-1.627, face:320},
+  {id:"gauchelafit", town:"Saint-Jean-de-Luz", name:"Gauche de Lafit",   lat:43.414, lon:-1.630, face:325, reef:true},
+  {id:"erromardie",  town:"Saint-Jean-de-Luz", name:"Erromardie",        lat:43.403, lon:-1.643, face:330},
+  {id:"saintebarbe", town:"Saint-Jean-de-Luz", name:"Sainte-Barbe",      lat:43.393, lon:-1.658, face:325, reef:true},
+  {id:"bougie",      town:"Ciboure",           name:"La Bougie (Socoa)", lat:43.394, lon:-1.684, face:20,  reef:true},
+  {id:"belharra",    town:"Urrugne",           name:"Belharra",          lat:43.405, lon:-1.665, face:315, big:true},
+  {id:"deuxjumeaux", town:"Hendaye",           name:"Les Deux Jumeaux",  lat:43.380, lon:-1.763, face:340, reef:true},
+  {id:"hendaye",     town:"Hendaye",           name:"Grande Plage",      lat:43.375, lon:-1.772, face:345},
 ];
 const WIND_MODELS = [
   {id:"meteofrance_arome_france_hd", name:"AROME HD", info:"Météo-France · 1,3 km · 2 jours"},
@@ -395,7 +426,7 @@ const GROUPS = [
   {id:"maree", name:"Marée",  rows:[["courbe","Courbe de marée"],["pmbm","Heures PM / BM"]]},
 ];
 const BLOCKS = [["wavecmp","Houle · comparaison des modèles"], ...WIND_MODELS.map(m=>[m.id, m.name+" · "+m.info])];
-const defaultPrefs = () => ({theme:"auto", sessions:[], spot:"cotebasques", step:3, days:7, night:"hide", hidden:[], open:{}, blocks:{wavecmp:true, meteofrance_arome_france_hd:true, ecmwf_ifs:true}});
+const defaultPrefs = () => ({favs:["cenitz"], theme:"auto", sessions:[], spot:"cenitz", step:3, days:7, night:"hide", hidden:[], open:{}, blocks:{wavecmp:true, meteofrance_arome_france_hd:true, ecmwf_ifs:true}});
 // Profils enregistrés sur cet appareil (la synchro entre appareils viendra avec la mise en ligne)
 let store = load("profiles", null);
 if(!store || !store.users || !store.users[store.current]){
@@ -406,7 +437,7 @@ let state;
 function useProfile(name){
   store.current = name;
   state = store.users[name] = {...defaultPrefs(), ...store.users[name]};
-  if(!SPOTS.some(s=>s.id===state.spot)) state.spot = "cotebasques";
+  if(!SPOTS.some(s=>s.id===state.spot)) state.spot = "cenitz";
 }
 useProfile(store.current);
 // Compte Supabase (clé publique : la sécurité est assurée par les règles d'accès de la base)
@@ -817,7 +848,20 @@ function renderLegend(){
 
 // ---------- Interface ----------
 function renderSpots(){
-  document.getElementById("spots").innerHTML = SPOTS.map(s=>`<button type="button" class="spot" data-id="${s.id}" aria-pressed="${s.id===state.spot}"><small>${s.town}</small><b>${s.name}</b></button>`).join("");
+  const favs = SPOTS.filter(x=>(state.favs||[]).includes(x.id));
+  const cur = SPOTS.find(x=>x.id===state.spot);
+  const list = cur && !favs.includes(cur) ? [...favs, cur] : favs;
+  document.getElementById("spots").innerHTML = list.map(x=>`<button type="button" class="spot${(state.favs||[]).includes(x.id)?"":" notfav"}" data-id="${x.id}" aria-pressed="${x.id===state.spot}"><small>${x.town}</small><b>${x.name}</b></button>`).join("")
+    + `<button type="button" class="spot allspots" id="allSpots"><small>${SPOTS.length} spots</small><b>☆ Mes spots</b></button>`;
+}
+// Choix des spots favoris
+const spotsDlg = document.getElementById("spotsDlg");
+function renderSpotPicker(){
+  const towns = [...new Set(SPOTS.map(x=>x.town))];
+  document.getElementById("spotPick").innerHTML = towns.map(t=>`<div class="sp-town"><h4>${t}</h4>${SPOTS.filter(x=>x.town===t).map(x=>{
+    const fav = (state.favs||[]).includes(x.id);
+    return `<div class="sp-row${x.id===state.spot?" cur":""}"><button type="button" class="sp-star" data-fav="${x.id}" aria-pressed="${fav}" aria-label="${fav?"Retirer":"Ajouter"} ${x.name} ${fav?"des":"aux"} favoris">${fav?"★":"☆"}</button><button type="button" class="sp-go" data-go="${x.id}">${x.name}${x.big?' <em>grosse houle</em>':x.reef?' <em>reef</em>':""}</button></div>`;
+  }).join("")}</div>`).join("");
 }
 function syncSeg(id, val){ document.querySelectorAll(`#${id} button`).forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.v==String(val)))); }
 function syncControls(){ syncSeg("segStep",state.step); syncSeg("segDays",state.days); syncSeg("segNight",state.night); syncSeg("segDir", state.dirDeg?"deg":"arrow"); }
@@ -845,8 +889,16 @@ async function show(force){
 }
 
 document.getElementById("spots").addEventListener("click", e=>{
+  if(e.target.closest("#allSpots")){ renderSpotPicker(); spotsDlg.showModal(); return; }
   const b = e.target.closest(".spot"); if(!b) return;
   state.spot = b.dataset.id; persist(); renderSpots(); show(false);
+});
+spotsDlg.addEventListener("click", e=>{
+  if(e.target===spotsDlg || e.target.closest("[data-close]")) return spotsDlg.close();
+  const f = e.target.closest("[data-fav]");
+  if(f){ const id = f.dataset.fav; state.favs = (state.favs||[]).includes(id) ? state.favs.filter(x=>x!==id) : [...(state.favs||[]), id]; persist(); renderSpotPicker(); renderSpots(); return; }
+  const g = e.target.closest("[data-go]");
+  if(g){ state.spot = g.dataset.go; persist(); renderSpots(); spotsDlg.close(); show(false); }
 });
 [["segStep","step",Number],["segDays","days",Number],["segNight","night",String]].forEach(([id,key,cast])=>{
   document.getElementById(id).addEventListener("click", e=>{
