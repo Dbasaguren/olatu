@@ -199,6 +199,12 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .sitem .del{border:0;background:none;color:var(--muted);font-size:12px;text-decoration:underline;padding:4px}
 .sitem .del:hover{color:var(--on-ink)}
 .sempty{color:var(--muted);font-size:13.5px;padding:6px 0}
+/* Compte */
+.acc-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.linkbtn{border:0;background:none;color:var(--muted);text-decoration:underline;font-size:13px;padding:4px}
+.linkbtn:hover{color:var(--accent)}
+.acc-who{margin:0;font-size:14px}
+.acc-imp{margin-top:10px;padding:10px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--bg);font-size:13.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
 /* Téléphone */
 @media (max-width:640px){
   .wrap{padding-inline:max(14px, env(safe-area-inset-left))}
@@ -274,11 +280,32 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 <dialog class="prefs" id="prefs" aria-labelledby="pdTitle">
   <div class="pd-head"><h2 id="pdTitle">Personnaliser</h2><button class="btn" type="button" data-close>Fermer</button></div>
   <div class="pd-body">
-    <section class="pd-sec">
-      <h3>Profil</h3>
+    <section class="pd-sec" id="accSec">
+      <h3>Compte</h3>
+      <form id="accForm">
+        <div class="frow">
+          <label>Email<input type="email" id="accEmail" autocomplete="email" required></label>
+          <label>Mot de passe<input type="password" id="accPass" autocomplete="current-password" minlength="8" required></label>
+        </div>
+        <div class="acc-btns"><button class="btn primary" type="submit">Se connecter</button><button class="btn" type="button" id="accSignup">Créer un compte</button><button class="linkbtn" type="button" id="accForgot">Mot de passe oublié ?</button></div>
+      </form>
+      <form id="accNewPass" hidden>
+        <div class="frow"><label>Nouveau mot de passe<input type="password" id="accNewPw" autocomplete="new-password" minlength="8" required></label></div>
+        <div class="acc-btns"><button class="btn primary" type="submit">Enregistrer le mot de passe</button></div>
+      </form>
+      <div id="accIn" hidden>
+        <p class="acc-who">Connecté : <b id="accMail"></b></p>
+        <div id="accImport"></div>
+        <div class="acc-btns"><button class="btn" type="button" id="accLogout">Se déconnecter</button><button class="btn danger" type="button" id="accDelete">Supprimer mon compte</button></div>
+      </div>
+      <p class="fmsg" id="accMsg" role="status"></p>
+      <p class="pd-hint">Avec un compte, tes réglages et tes sessions te suivent sur tous tes appareils. Personne d'autre ne peut les voir.</p>
+    </section>
+    <section class="pd-sec" id="profSec">
+      <h3>Profil sans compte</h3>
       <div class="profiles" id="profList"></div>
       <form class="newp" id="newProf"><input id="newName" maxlength="20" placeholder="Nom d'un nouveau profil" aria-label="Nom du nouveau profil"><button class="btn" type="submit">Créer</button></form>
-      <p class="pd-hint">Chaque profil garde ses lignes, ses blocs, son spot et ses réglages. Les profils sont enregistrés dans ce navigateur. La connexion avec mot de passe et la synchronisation entre appareils viendront avec la mise en ligne.</p>
+      <p class="pd-hint">Sans compte, chaque profil garde ses réglages et ses sessions dans ce navigateur uniquement.</p>
     </section>
     <section class="pd-sec">
       <h3>Lignes du tableau</h3>
@@ -324,6 +351,7 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
   </div>
 </dialog>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script>
 "use strict";
 // ---------- Spots (orientation = direction vers laquelle la plage fait face, en degrés) ----------
@@ -381,7 +409,23 @@ function useProfile(name){
   if(!SPOTS.some(s=>s.id===state.spot)) state.spot = "cotebasques";
 }
 useProfile(store.current);
-const persist = () => save("profiles", store);
+// Compte Supabase (clé publique : la sécurité est assurée par les règles d'accès de la base)
+const SB_URL = "https://ednyjpdqbxfzbicbmieq.supabase.co", SB_KEY = "sb_publishable_2dGM071JZVxkA6rPuCHD_A_KNtLgJMy";
+const sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+let account = null;   // {id, email, ready}
+// Compte déjà connecté sur cet appareil : on affiche tout de suite ses données en cache (utile hors ligne)
+if(store.account && store.account.state){
+  account = {id:store.account.id, email:store.account.email, ready:false};
+  state = store.account.state = {...defaultPrefs(), ...store.account.state};
+}
+let prefsTimer = null;
+const prefsOf = st => { const {sessions, ...rest} = st; return rest; };
+function syncPrefsSoon(){
+  if(!account || !account.ready || !sb) return;
+  clearTimeout(prefsTimer);
+  prefsTimer = setTimeout(()=>{ sb.from("profiles").upsert({id:account.id, prefs:prefsOf(state), updated_at:new Date().toISOString()}).then(({error})=>{ if(error) console.warn("Réglages non synchronisés :", error.message); }); }, 800);
+}
+const persist = () => { save("profiles", store); syncPrefsSoon(); };
 const shown = id => !state.hidden.includes(id);
 
 // ---------- Temps (heures locales "naïves" traitées en UTC pour éviter les soucis de changement d'heure) ----------
@@ -815,14 +859,18 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ rend
 // ---------- Profils et personnalisation ----------
 const esc = t => String(t).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function renderWho(){
-  document.getElementById("whoName").textContent = store.current;
-  document.getElementById("avatar").textContent = store.current.trim().charAt(0).toUpperCase() || "?";
+  const name = account ? account.email.split("@")[0] : store.current;
+  document.getElementById("whoName").textContent = name;
+  document.getElementById("avatar").textContent = name.trim().charAt(0).toUpperCase() || "?";
 }
 function renderPrefs(){
   document.getElementById("profList").innerHTML = Object.keys(store.users).map(n=>`<button type="button" data-p="${esc(n)}" aria-pressed="${n===store.current}">${esc(n)}</button>`).join("");
   document.getElementById("rowChecks").innerHTML = GROUPS.map(g=>`<div class="rg g-${g.id}"><b>${g.name}</b>${g.rows.map(([id,name])=>`<label class="chk"><input type="checkbox" id="row-${id}" data-row="${id}" ${shown(id)?"checked":""}>${name}</label>`).join("")}</div>`).join("");
   document.getElementById("blockChecks").innerHTML = `<div class="rg g-blocs"><b>Sous le tableau</b>${BLOCKS.map(([id,name])=>`<label class="chk"><input type="checkbox" id="blk-${id}" data-blk="${id}" ${state.blocks[id]?"checked":""}>${name}</label>`).join("")}</div>`;
   document.getElementById("delProf").disabled = Object.keys(store.users).length < 2;
+  document.getElementById("profSec").hidden = !!account;
+  document.getElementById("delProf").hidden = !!account;
+  renderAccount();
   syncSeg("segTheme", state.theme || "auto");
 }
 function applyTheme(){
@@ -867,6 +915,124 @@ document.getElementById("resetProf").addEventListener("click", ()=>{
 
 applyTheme(); renderWho(); renderSpots(); syncControls(); show(false);
 
+
+// ---------- Compte : connexion, synchronisation ----------
+const rowToSess = r => ({id:r.id, spot:r.spot, date:r.date, h0:r.h0, h1:r.h1, rating:r.rating, note:r.note||"", f:r.f, savedAt:r.saved_at});
+const sessToRow = x => ({id:x.id, spot:x.spot, date:x.date, h0:x.h0, h1:x.h1, rating:x.rating, note:x.note||null, f:x.f});
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+Math.random().toString(36).slice(2,10));
+function accMsg(text, err){ const m = document.getElementById("accMsg"); m.textContent = text || ""; m.className = "fmsg" + (err ? " err" : ""); }
+const FR_ERR = {
+  "Invalid login credentials": "Email ou mot de passe incorrect.",
+  "Email not confirmed": "Confirme d'abord ton email : clique sur le lien reçu, puis reconnecte-toi.",
+  "User already registered": "Un compte existe déjà avec cet email : connecte-toi.",
+};
+const frErr = e => FR_ERR[e.message] || e.message;
+
+async function useAccount(user){
+  const cached = store.account && store.account.id===user.id ? store.account.state : null;
+  const seed = cached || store.users[store.current];   // 1re connexion : on reprend les réglages du profil actuel
+  account = {id:user.id, email:user.email, ready:false};
+  state = {...defaultPrefs(), ...prefsOf(seed || {}), sessions: cached ? cached.sessions : []};
+  store.account = {id:user.id, email:user.email, state};
+  save("profiles", store); applyAll(); renderAccount();
+  try{
+    const [p, r] = await Promise.all([
+      sb.from("profiles").select("prefs").eq("id", user.id).maybeSingle(),
+      sb.from("sessions").select("*").order("date", {ascending:false}),
+    ]);
+    if(p.error) throw p.error; if(r.error) throw r.error;
+    if(!account || account.id!==user.id) return;
+    if(p.data && p.data.prefs) Object.assign(state, defaultPrefs(), p.data.prefs);
+    state.sessions = r.data.map(rowToSess);
+    account.ready = true;
+    if(!p.data) syncPrefsSoon();   // crée la fiche du compte avec les réglages actuels
+    save("profiles", store); applyAll(); renderAccount();
+  }catch(err){
+    accMsg("Synchronisation impossible : " + frErr(err) + " Tes données restent affichées depuis cet appareil.", true);
+  }
+}
+function leaveAccount(){
+  account = null; store.account = null;
+  useProfile(store.current); save("profiles", store); applyAll(); renderAccount();
+}
+function renderAccount(){
+  const logged = !!account;
+  document.getElementById("accForm").hidden = logged || !document.getElementById("accNewPass").hidden;
+  document.getElementById("accIn").hidden = !logged;
+  if(!sb){ document.getElementById("accForm").hidden = true; accMsg("Connexion indisponible (pas de réseau). Recharge l'appli une fois connecté à Internet.", true); }
+  if(!logged) return;
+  document.getElementById("accMail").textContent = account.email;
+  // Sessions notées sans compte dans ce navigateur : proposer de les ajouter au compte
+  const known = new Set(state.sessions.map(x=>x.id));
+  const local = Object.entries(store.users).flatMap(([n,u])=>(u.sessions||[]).filter(x=>!known.has(x.id)).map(x=>({...x, _p:n})));
+  document.getElementById("accImport").innerHTML = local.length && account.ready
+    ? `<div class="acc-imp"><span>Ce navigateur contient <b>${local.length}</b> session${local.length>1?"s":""} notée${local.length>1?"s":""} sans compte.</span><button class="btn" type="button" id="accImportBtn">Les ajouter à mon compte</button></div>` : "";
+}
+document.getElementById("accImport").addEventListener("click", async e=>{
+  if(!e.target.closest("#accImportBtn")) return;
+  const known = new Set(state.sessions.map(x=>x.id));
+  const local = Object.values(store.users).flatMap(u=>(u.sessions||[]).filter(x=>!known.has(x.id)));
+  const {error} = await sb.from("sessions").upsert(local.map(sessToRow));
+  if(error) return accMsg("Import impossible : " + frErr(error), true);
+  state.sessions.push(...local);
+  Object.values(store.users).forEach(u=>{ u.sessions = []; });
+  save("profiles", store); applyAll(); renderAccount();
+  accMsg(`${local.length} session${local.length>1?"s":""} ajoutée${local.length>1?"s":""} à ton compte.`);
+});
+const credentials = () => ({email:document.getElementById("accEmail").value.trim(), password:document.getElementById("accPass").value});
+document.getElementById("accForm").addEventListener("submit", async e=>{
+  e.preventDefault(); if(!sb) return;
+  accMsg("Connexion…");
+  const {error} = await sb.auth.signInWithPassword(credentials());
+  if(error) return accMsg(frErr(error), true);
+  document.getElementById("accPass").value = ""; accMsg("Connecté. Tes réglages et tes sessions sont synchronisés.");
+});
+document.getElementById("accSignup").addEventListener("click", async ()=>{
+  if(!sb) return;
+  const c = credentials();
+  if(!c.email || c.password.length < 8) return accMsg("Indique ton email et un mot de passe d'au moins 8 caractères.", true);
+  accMsg("Création du compte…");
+  const {data, error} = await sb.auth.signUp({...c, options:{emailRedirectTo: location.origin + location.pathname}});
+  if(error) return accMsg(frErr(error), true);
+  document.getElementById("accPass").value = "";
+  accMsg(data.session ? "Compte créé, tu es connecté." : `Compte créé. Ouvre l'email envoyé à ${c.email}, clique sur le lien de confirmation, puis connecte-toi ici.`);
+});
+document.getElementById("accForgot").addEventListener("click", async ()=>{
+  if(!sb) return;
+  const email = document.getElementById("accEmail").value.trim();
+  if(!email) return accMsg("Indique ton email, puis clique à nouveau sur « Mot de passe oublié ? ».", true);
+  const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo: location.origin + location.pathname});
+  accMsg(error ? frErr(error) : `Email envoyé à ${email} : clique sur le lien pour choisir un nouveau mot de passe.`, !!error);
+});
+document.getElementById("accNewPass").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const {error} = await sb.auth.updateUser({password:document.getElementById("accNewPw").value});
+  if(error) return accMsg(frErr(error), true);
+  document.getElementById("accNewPass").hidden = true; document.getElementById("accNewPw").value = "";
+  renderAccount(); accMsg("Mot de passe changé.");
+});
+document.getElementById("accLogout").addEventListener("click", async ()=>{ await sb?.auth.signOut(); leaveAccount(); accMsg("Déconnecté."); });
+let delArmed = false;
+document.getElementById("accDelete").addEventListener("click", async e=>{
+  const b = e.currentTarget;
+  if(!delArmed){ delArmed = true; b.textContent = "Confirmer : tout supprimer définitivement"; accMsg("Ton compte, tes réglages et toutes tes sessions seront effacés. Clique à nouveau pour confirmer.", true); return; }
+  delArmed = false; b.textContent = "Supprimer mon compte";
+  const {error} = await sb.rpc("delete_my_account");
+  if(error) return accMsg("Suppression impossible : " + frErr(error), true);
+  await sb.auth.signOut(); leaveAccount(); accMsg("Compte supprimé.");
+});
+if(sb){
+  sb.auth.onAuthStateChange((event, session)=>{
+    // Hors du callback : la bibliothèque déconseille d'appeler Supabase directement dedans
+    setTimeout(()=>{
+      const u = session && session.user;
+      if(event==="PASSWORD_RECOVERY"){ document.getElementById("accNewPass").hidden = false; openPrefs(); accMsg("Choisis ton nouveau mot de passe."); }
+      if(u && (!account || account.id!==u.id || !account.ready)) useAccount(u);
+      else if(!u && account) leaveAccount();
+      renderAccount(); renderWho();
+    }, 0);
+  });
+}
 
 // ---------- Sessions notées ----------
 const sessDlg = document.getElementById("sessDlg");
@@ -942,7 +1108,13 @@ sessDlg.addEventListener("click", e=>{
   const r = e.target.closest("[data-r]");
   if(r){ sfRating = +r.dataset.r; document.querySelectorAll("#sfRate button").forEach(b=>b.setAttribute("aria-pressed", String(+b.dataset.r===sfRating))); }
   const del = e.target.closest("[data-del]");
-  if(del){ state.sessions = state.sessions.filter(x=>x.id!==del.dataset.del); persist(); renderSessList(); applyAll(); }
+  if(del){
+    const id = del.dataset.del;
+    (async ()=>{
+      if(account){ const {error} = await sb.from("sessions").delete().eq("id", id); if(error){ document.getElementById("sfMsg").className = "fmsg err"; document.getElementById("sfMsg").textContent = "Suppression impossible : " + frErr(error); return; } }
+      state.sessions = state.sessions.filter(x=>x.id!==id); persist(); renderSessList(); applyAll();
+    })();
+  }
 });
 document.getElementById("sessForm").addEventListener("submit", async e=>{
   e.preventDefault();
@@ -958,7 +1130,12 @@ document.getElementById("sessForm").addEventListener("submit", async e=>{
   let f = null;
   try{ f = await fetchConditions(spot, date, h0, h1); }
   catch(err){ msg.className = "fmsg err"; msg.textContent = "Conditions introuvables pour cette date : " + err.message + " La session n'est pas enregistrée."; btn.disabled = false; return; }
-  state.sessions.push({id:Date.now().toString(36), spot:spot.id, date, h0, h1, rating:sfRating, note:document.getElementById("sfNote").value.trim(), f, savedAt:new Date().toISOString()});
+  const sess = {id:newId(), spot:spot.id, date, h0, h1, rating:sfRating, note:document.getElementById("sfNote").value.trim(), f, savedAt:new Date().toISOString()};
+  if(account){
+    const {error} = await sb.from("sessions").insert(sessToRow(sess));
+    if(error){ msg.className = "fmsg err"; msg.textContent = "Session non enregistrée dans ton compte : " + frErr(error) + " Vérifie ta connexion et réessaie."; btn.disabled = false; return; }
+  }
+  state.sessions.push(sess);
   persist();
   msg.textContent = `Session enregistrée : ${f.hs.toFixed(1)} m à ${Math.round(f.per)} s, ta note ${sfRating}/10. Les notes du tableau sont mises à jour.`;
   btn.disabled = false; document.getElementById("sfNote").value = ""; sfRating = null; fillSessForm(); renderSessList(); applyAll();
