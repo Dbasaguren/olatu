@@ -23,18 +23,18 @@
   --accent:#0b6e7a; --accent-soft:#d9eef0; --night:rgba(18,36,51,.06); --today:#0b6e7a;
   --off:#cfeedd; --cross:#f3ecd2; --on:#f6d4cf; --off-ink:#1d6b45; --on-ink:#9a3226;
   --tide-fill:rgba(11,110,122,.16); --tide-line:#0b6e7a; --star:#e0a100;
-  --g-surf:#c98f00; --g-houle:#5f66d9; --g-vent:#169a50; --g-maree:#0b6e7a; --grp-bg:#f5f8fa;
+  --g-surf:#c98f00; --g-houle:#5f66d9; --g-vent:#169a50; --g-maree:#0b6e7a; --g-fun:#d14d8b; --grp-bg:#f5f8fa;
   --f-ui:"Barlow",system-ui,"Segoe UI",sans-serif; --f-data:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --g-surf:#f2c14e; --g-houle:#9ea4ff; --g-vent:#5fd38f; --g-maree:#4fc1cc; --grp-bg:#0f1a22;
+  --g-surf:#f2c14e; --g-houle:#9ea4ff; --g-vent:#5fd38f; --g-maree:#4fc1cc; --g-fun:#f28cbc; --grp-bg:#0f1a22;
   --bg:#0c161e; --surface:#121f29; --ink:#e3ecf1; --muted:#8fa3b1; --line:#22343f; --line-strong:#3d5463;
   --accent:#4fc1cc; --accent-soft:#163a40; --night:rgba(0,0,0,.28); --today:#4fc1cc;
   --off:#2f7a52; --cross:#6b5d2a; --on:#8a3a30; --off-ink:#e6fff1; --on-ink:#ffe3de;
   --tide-fill:rgba(79,193,204,.18); --tide-line:#4fc1cc; --star:#f2c14e; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --g-surf:#f2c14e; --g-houle:#9ea4ff; --g-vent:#5fd38f; --g-maree:#4fc1cc; --grp-bg:#0f1a22;
+  --g-surf:#f2c14e; --g-houle:#9ea4ff; --g-vent:#5fd38f; --g-maree:#4fc1cc; --g-fun:#f28cbc; --grp-bg:#0f1a22;
   --bg:#0c161e; --surface:#121f29; --ink:#e3ecf1; --muted:#8fa3b1; --line:#22343f; --line-strong:#3d5463;
   --accent:#4fc1cc; --accent-soft:#163a40; --night:rgba(0,0,0,.28); --today:#4fc1cc;
   --off:#2f7a52; --cross:#6b5d2a; --on:#8a3a30; --off-ink:#e6fff1; --on-ink:#ffe3de;
@@ -99,6 +99,7 @@ table.fc th.lab small{display:block;font-weight:400;font-size:10.5px;color:var(-
 table.fc .ds{border-left:2px solid var(--line-strong)}
 table.fc tr.day th{height:auto;padding:6px 4px 5px;font:600 13px/1.15 var(--f-ui);background:var(--surface);border-bottom:0;text-align:left;padding-left:8px;white-space:nowrap;overflow:hidden}
 table.fc tr.day th.today{color:var(--today)}
+table.fc tr.day .sun{display:block;white-space:normal;font:500 11.5px/1.2 var(--f-data);color:var(--muted);margin-top:3px}
 table.fc tr.day .coef{display:block;white-space:normal;font:500 12.5px/1.2 var(--f-data);color:var(--muted);margin-top:4px}
 .cf{display:inline-block;padding:1px 6px;border-radius:4px;font-size:15px;font-weight:700;color:var(--ink)}
 table.fc tr.hour td{color:var(--muted);font-size:12px;height:20px}
@@ -143,7 +144,7 @@ table.fc tr.grp th, table.fc tr.grp td{height:22px;background:var(--grp-bg);bord
 table.fc tr.grp th.lab{font:700 10.5px/1 var(--f-ui);text-transform:uppercase;letter-spacing:.12em;background:var(--grp-bg);color:var(--gc)}
 table.fc tr.grp:first-child th, table.fc tr.grp:first-child td{border-top:0}
 table.fc tr[class*="g-"] th.lab{box-shadow:inset 3px 0 0 var(--gc)}
-tr.g-surf{--gc:var(--g-surf)} tr.g-houle{--gc:var(--g-houle)} tr.g-vent{--gc:var(--g-vent)} tr.g-maree{--gc:var(--g-maree)}
+tr.g-surf{--gc:var(--g-surf)} tr.g-houle{--gc:var(--g-houle)} tr.g-vent{--gc:var(--g-vent)} tr.g-maree{--gc:var(--g-maree)} tr.g-fun{--gc:var(--g-fun)}
 table.fc tbody tr:not(.grp):hover td{box-shadow:inset 0 1px 0 var(--line-strong), inset 0 -1px 0 var(--line-strong)}
 
 /* Profil + panneau Personnaliser */
@@ -165,7 +166,7 @@ dialog.prefs::backdrop{background:rgba(10,20,28,.45)}
 .rowgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px 18px}
 .rg{border-left:3px solid var(--gc);padding-left:10px}
 .rg b{display:block;font:700 11px var(--f-ui);text-transform:uppercase;letter-spacing:.1em;color:var(--gc);margin-bottom:4px}
-.rg.g-surf{--gc:var(--g-surf)} .rg.g-houle{--gc:var(--g-houle)} .rg.g-vent{--gc:var(--g-vent)} .rg.g-maree{--gc:var(--g-maree)} .rg.g-blocs{--gc:var(--muted)}
+.rg.g-surf{--gc:var(--g-surf)} .rg.g-houle{--gc:var(--g-houle)} .rg.g-vent{--gc:var(--g-vent)} .rg.g-maree{--gc:var(--g-maree)} .rg.g-fun{--gc:var(--g-fun)} .rg.g-blocs{--gc:var(--muted)}
 .chk{display:flex;align-items:center;gap:7px;font-size:14px;padding:2px 0;cursor:pointer}
 .chk input{accent-color:var(--accent);width:15px;height:15px;margin:0}
 .pd-foot{display:flex;justify-content:space-between;gap:8px;padding:12px 18px;border-top:1px solid var(--line)}
@@ -199,6 +200,11 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .sitem .del{border:0;background:none;color:var(--muted);font-size:12px;text-decoration:underline;padding:4px}
 .sitem .del:hover{color:var(--on-ink)}
 .sempty{color:var(--muted);font-size:13.5px;padding:6px 0}
+/* Bichomètre */
+td.bicho{height:auto;padding:5px 4px;font:500 12px/1.2 var(--f-ui);white-space:normal}
+td.bicho .bb1{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--g-fun);color:#fff;font-weight:700;animation:bb1 1.6s ease-in-out infinite}
+td.bicho .bnorm{color:var(--muted)}
+@keyframes bb1{50%{opacity:.6}}
 /* Spots favoris */
 .spot.notfav{border-style:dashed}
 .spot.allspots{background:none;border-style:dashed;color:var(--accent)}
@@ -251,7 +257,7 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
   .legend{grid-template-columns:1fr}
   .rate{grid-template-columns:repeat(6,1fr)}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
@@ -424,6 +430,7 @@ const GROUPS = [
   {id:"houle", name:"Houle",  rows:[["houle","Hauteur"],["periode","Période"],["dirhoule","Direction"],["energie","Énergie (kJ)"]]},
   {id:"vent",  name:"Vent",   rows:[["vent","Vent moyen"],["rafales","Rafales"],["dirvent","Direction (off / on)"]]},
   {id:"maree", name:"Marée",  rows:[["courbe","Courbe de marée"],["pmbm","Heures PM / BM"]]},
+  {id:"fun",   name:"Fun",    rows:[["bicho","Bichomètre"]]},
 ];
 const BLOCKS = [["wavecmp","Houle · comparaison des modèles"], ...WIND_MODELS.map(m=>[m.id, m.name+" · "+m.info])];
 const defaultPrefs = () => ({favs:["cenitz"], theme:"auto", sessions:[], spot:"cenitz", step:3, days:7, night:"hide", hidden:[], open:{}, blocks:{wavecmp:true, meteofrance_arome_france_hd:true, ecmwf_ifs:true}});
@@ -666,6 +673,7 @@ function buildCols(w){
     if(state.night==="hide" && (t < sr - 2*H || t > ss + H)) return;
     cols.push({t, h, dk, night, now: now >= t - step*H/2 && now < t + step*H/2});
   });
+  cols.sun = sun;
   return cols;
 }
 
@@ -732,7 +740,8 @@ function render(spot, data){
       const dt = new Date(tp(d.dk)), name = `${DAYS[dt.getUTCDay()]} ${dt.getUTCDate()}`;
       const cf = coefs[d.dk] || [];
       const cfs = cf.length ? `<span class="coef">coef ${cf.map(v=>`<span class="cf" style="${cfStyle(v)}">${v}</span>`).join(" ")}</span>` : "";
-      return `<th colspan="${d.n}" class="ds${d.dk===todayKey?" today":""}" scope="colgroup">${d.dk===todayKey?"Aujourd'hui":name}${cfs}</th>`;
+      const sn = cols.sun[d.dk], sun = sn ? `<span class="sun" title="Lever et coucher du soleil">☀ ${hhmm(sn[0])} – ${hhmm(sn[1])}</span>` : "";
+      return `<th colspan="${d.n}" class="ds${d.dk===todayKey?" today":""}" scope="colgroup">${d.dk===todayKey?"Aujourd'hui":name}${cfs}${sun}</th>`;
     }).join("")}</tr>`;
     const hourRow = `<tr class="hour">${lab("")}${cols.map(c=>td(c, `${c.h}h`, c.now?"now":"")).join("")}</tr>`;
     return dayRow + hourRow;
@@ -772,6 +781,13 @@ function render(spot, data){
     return `<td colspan="${d.n}" class="ds tt"><div>${list.map(e=>`<span class="${e.type==="PM"?"pm":"bm"}"><i>${e.type==="PM"?"▲":"▼"}</i>${hhmm(e.t)}<em>${e.v.toFixed(1)}</em></span>`).join("")}</div></td>`;
   }).join("")}`;
 
+  // Bichomètre : un jour sur trois, alerte BB1 ; les autres jours, un niveau tiré au sort (fixe pour chaque date)
+  const BICHO = ["Rien à l'horizon", "Quelques traces", "Zone fréquentée"];
+  const bichoRow = () => `${lab("Bichomètre","pour rire")}${days.map(d=>{
+    const n = Math.floor(tp(d.dk)/864e5);
+    const inner = n%3===0 ? `<span class="bb1">Attention BB1 pas loin</span>` : `<span class="bnorm">${BICHO[(n*7919)%3]}</span>`;
+    return `<td colspan="${d.n}" class="ds bicho">${inner}</td>`;
+  }).join("")}`;
   const gap = `<tr class="gap"><th class="lab"></th><td colspan="${cols.length}"></td></tr>`;
   // Pas de note tant que tu n'as noté aucune session sur ce spot
   const spotSess = state.sessions.filter(x=>x.spot===spot.id && x.f).length;
@@ -798,6 +814,7 @@ function render(spot, data){
     dirvent:  `${lab("Direction","off / side / on")}${cols.map(c=>td(c, arrow(c.wdir, c.wdir==null?"":`Vent de ${card(c.wdir)} (${Math.round(c.wdir)}°), ${REL_TXT[c.rel]}`), "dirc "+(c.rel||""))).join("")}`,
     courbe:   tideRow(),
     pmbm:     tideTimesRow(),
+    bicho:    bichoRow(),
   };
   const body = GROUPS.map(g=>{
     const rows = g.rows.filter(([id])=>shown(id));
@@ -843,6 +860,7 @@ function render(spot, data){
     `Face au <b>${card(spot.face)}</b> (${spot.face}°)`,
     `Offshore par vent de <b>${card(offDir)}</b>`,
     todayCoef.length ? `Coef du jour <b>${todayCoef.join(" / ")}</b>` : "",
+    cols.sun[todayKey] ? `Soleil <b>${hhmm(cols.sun[todayKey][0])}</b> – <b>${hhmm(cols.sun[todayKey][1])}</b>` : "",
     nextPM ? `Prochaine PM <b>${hhmm(nextPM.t)}</b>` : "",
     nextBM ? `Prochaine BM <b>${hhmm(nextBM.t)}</b>` : "",
     (()=>{ const n = state.sessions.filter(x=>x.spot===spot.id).length; return n ? `<b>${n}</b> session${n>1?"s":""} notée${n>1?"s":""} ici` : ""; })(),
