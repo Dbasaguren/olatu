@@ -209,11 +209,24 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .viewtabs button{border:0;background:none;padding:9px 16px;font-weight:700;font-size:15px;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
 .viewtabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
 #mapView{margin-top:14px}
-.map-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-.map-hint{color:var(--muted);font-size:13px}
-.map-frame{height:max(420px, calc(100vh - 300px));border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
-.map-frame iframe{width:100%;height:100%;border:0;display:block}
-@media (max-width:640px){.map-frame{margin-inline:-14px;border-radius:0;border-inline:0;height:calc(100vh - 250px)}}
+.map-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-bottom:10px}
+.map-ext{color:var(--muted);font-size:13px}
+.map-ext:hover{color:var(--accent)}
+.map-wrap{position:relative}
+.map-frame{height:max(440px, calc(100vh - 330px));border-radius:10px;overflow:hidden;background:#0b1622}
+#mapFrame.leaflet-container{background:#0b1622;font:inherit}
+.map-load{position:absolute;inset:0;display:grid;place-items:center;color:#cfe3ee;font-weight:600;background:rgba(11,22,34,.55);border-radius:10px;pointer-events:none}
+.map-legend{position:absolute;left:12px;bottom:12px;z-index:500;background:rgba(11,22,34,.82);color:#e3ecf1;border-radius:8px;padding:7px 10px 6px;font:500 11px var(--f-data);pointer-events:none;min-width:220px}
+.map-legend b{display:block;font:700 10.5px var(--f-ui);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;color:#9fb6c4}
+.map-legend .bar{height:9px;border-radius:5px}
+.map-legend .ticks{display:flex;justify-content:space-between;margin-top:3px;font-variant-numeric:tabular-nums}
+.map-time{display:flex;align-items:center;gap:12px;margin-top:10px}
+.map-time input{flex:1;accent-color:var(--accent)}
+.map-time .btn{width:44px;padding:7px 0;font-size:15px}
+.map-when{font:700 14px var(--f-data);min-width:96px;text-align:right;font-variant-numeric:tabular-nums}
+.leaflet-popup-content{font:500 13px/1.45 var(--f-ui);margin:9px 12px}
+.leaflet-popup-content b{font-size:15px}
+@media (max-width:640px){.map-frame,.map-load{margin-inline:-14px;border-radius:0}.map-frame{height:calc(100vh - 290px)}.map-legend{min-width:180px}}
 /* Bichomètre */
 td.bicho{height:auto;padding:5px 4px;font:500 12px/1.2 var(--f-ui);white-space:normal}
 td.bicho .bb1{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--g-fun);color:#fff;font-weight:700;animation:bb1 1.6s ease-in-out infinite}
@@ -303,11 +316,20 @@ td.bicho .bnorm{color:var(--muted)}
   </div>
   <section id="mapView" hidden>
     <div class="map-bar">
-      <div class="seg" id="segLayer"><button type="button" data-v="waves">Vagues</button><button type="button" data-v="swell1">Houle principale</button><button type="button" data-v="wind">Vent</button></div>
-      <span class="map-hint">Appuie sur ▶ en bas de la carte pour voir la houle arriver sur les prochains jours.</span>
+      <div class="seg" id="segLayer"><button type="button" data-v="swell">Houle</button><button type="button" data-v="period">Période</button><button type="button" data-v="wind">Vent</button></div>
+      <a class="map-ext" id="windyLink" href="https://www.windy.com" target="_blank" rel="noopener">Voir aussi sur Windy ↗</a>
     </div>
-    <div class="map-frame" id="mapFrame"></div>
-    <p class="pd-hint">Carte fournie par <a href="https://www.windy.com" target="_blank" rel="noopener">Windy.com</a> (modèle de vagues ECMWF). Le point marque le spot sélectionné.</p>
+    <div class="map-wrap">
+      <div class="map-frame" id="mapFrame"></div>
+      <div class="map-load" id="mapLoad" role="status">Chargement de la carte…</div>
+      <div class="map-legend" id="mapLegend"></div>
+    </div>
+    <div class="map-time">
+      <button class="btn primary" type="button" id="mapPlay" aria-label="Lancer l'animation">▶</button>
+      <input type="range" id="mapSlider" min="0" max="0" value="0" aria-label="Moment de la prévision">
+      <span class="map-when" id="mapWhen">–</span>
+    </div>
+    <p class="pd-hint">Touche la carte pour lire les valeurs à un endroit. Les flèches indiquent où va la houle (ou le vent) ; plus elles sont longues, plus la période (ou le vent) est forte. Données Open-Meteo (modèles de vagues MFWAM / ECMWF, vent ECMWF), côtes Natural Earth. Appuie sur ▶ pour voir la houle arriver sur les 7 prochains jours.</p>
   </section>
   <div id="out"><div class="block"><div class="msg"><b>Chargement des prévisions…</b>Houle, vent et marée depuis Open-Meteo.</div></div></div>
 
@@ -461,7 +483,7 @@ const GROUPS = [
   {id:"fun",   name:"Fun",    rows:[["bicho","Bichomètre"]]},
 ];
 const BLOCKS = [["wavecmp","Houle · comparaison des modèles"], ...WIND_MODELS.map(m=>[m.id, m.name+" · "+m.info])];
-const defaultPrefs = () => ({view:"fc", mapLayer:"waves", favs:["cenitz"], theme:"auto", sessions:[], spot:"cenitz", step:3, days:7, night:"hide", hidden:[], open:{}, blocks:{wavecmp:true, meteofrance_arome_france_hd:true, ecmwf_ifs:true}});
+const defaultPrefs = () => ({view:"fc", mapLayer:"swell", favs:["cenitz"], theme:"auto", sessions:[], spot:"cenitz", step:3, days:7, night:"hide", hidden:[], open:{}, blocks:{wavecmp:true, meteofrance_arome_france_hd:true, ecmwf_ifs:true}});
 // Profils enregistrés sur cet appareil (la synchro entre appareils viendra avec la mise en ligne)
 let store = load("profiles", null);
 if(!store || !store.users || !store.users[store.current]){
@@ -1034,25 +1056,244 @@ document.getElementById("resetProf").addEventListener("click", ()=>{
   state.hidden = []; BLOCKS.forEach(([id])=>state.blocks[id] = true); renderPrefs(); applyAll();
 });
 
-// ---------- Onglet Carte (Windy) ----------
-function windyUrl(layer, spot){
-  const q = {lat:44.5, lon:-6.5, detailLat:spot.lat, detailLon:spot.lon, zoom:5, level:"surface", overlay:layer,
-    product: layer==="wind" ? "ecmwf" : "ecmwfWaves", menu:"", message:"true", marker:"true", calendar:"now",
-    type:"map", location:"coordinates", metricWind:"kt", metricTemp:"°C"};
-  return "https://embed.windy.com/embed2.html?" + qs(q);
+// ---------- Onglet Carte : notre carte de houle et de vent ----------
+// Deux grilles de points Open-Meteo : large sur l'Atlantique, fine sur le golfe de Gascogne
+const MAPGRIDS = [
+  {lat0:42, lat1:48, lon0:-6, lon1:-1, step:0.5},
+  {lat0:34.5, lat1:57, lon0:-35, lon1:-0.5, step:1.5},
+];
+const hex = h => [1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const PAL = {
+  swell:  {name:"Hauteur de houle", unit:"m",   ticks:[0,1,2,3,4,6,8],     stops:[[0,"#0d1b4c"],[0.5,"#123f8c"],[1,"#1673b8"],[1.5,"#18a5b5"],[2,"#3cc47c"],[2.5,"#9bd94a"],[3,"#f2d43b"],[4,"#f59a2c"],[5,"#e8512f"],[6,"#c92a5a"],[8,"#8a2fc2"],[10,"#d1a8ff"]]},
+  period: {name:"Période de houle", unit:"s",   ticks:[4,8,10,12,14,16,20], stops:[[4,"#0d1b4c"],[7,"#1673b8"],[9,"#18a5b5"],[11,"#3cc47c"],[13,"#f2d43b"],[15,"#f59a2c"],[17,"#e8512f"],[20,"#8a2fc2"]]},
+  wind:   {name:"Vent",             unit:"nds", ticks:[0,10,15,20,25,30,40], stops:[[0,"#0d1b4c"],[5,"#1673b8"],[10,"#18a5b5"],[15,"#3cc47c"],[20,"#f2d43b"],[25,"#f59a2c"],[30,"#e8512f"],[40,"#8a2fc2"]]},
+};
+Object.values(PAL).forEach(p=>p.rgb = p.stops.map(([v,c])=>[v, ...hex(c)]));
+function palRgb(p, v){
+  const s = p.rgb;
+  if(v<=s[0][0]) return s[0].slice(1);
+  for(let i=0;i<s.length-1;i++){ const a=s[i], b=s[i+1]; if(v<=b[0]){ const f=(v-a[0])/(b[0]-a[0]); return [a[1]+(b[1]-a[1])*f, a[2]+(b[2]-a[2])*f, a[3]+(b[3]-a[3])*f]; } }
+  return s[s.length-1].slice(1);
 }
+const PLACES = [["Biarritz",43.48,-1.56,7],["Hossegor",43.66,-1.40,7],["Saint-Sébastien",43.32,-1.98,7],["Bilbao",43.26,-2.93,5],["Santander",43.46,-3.80,6],["Gijón",43.54,-5.66,6],["La Corogne",43.36,-8.41,5],["Lisbonne",38.72,-9.14,5],["Porto",41.15,-8.61,6],["Bordeaux",44.84,-0.58,5],["Arcachon",44.66,-1.17,7],["La Rochelle",46.16,-1.15,6],["Nantes",47.22,-1.55,6],["Brest",48.39,-4.49,5],["Cornouailles",50.2,-5.2,6],["Irlande",52.8,-8.0,4],["Açores",38.6,-28.0,4]];
+const MAP = {map:null, canvas:null, data:{}, land:null, ti:0, timer:null, loading:null};
+
+function loadScript(src){ return new Promise((ok, ko)=>{ const t=document.createElement("script"); t.src=src; t.onload=ok; t.onerror=()=>ko(new Error("chargement impossible : "+src)); document.head.appendChild(t); }); }
+function loadCss(href){ const l=document.createElement("link"); l.rel="stylesheet"; l.href=href; document.head.appendChild(l); }
+
+// Télécharge une couche (houle ou vent) sur les deux grilles ; null = terre
+async function fetchLayerData(kind){
+  const c = MAP.data[kind]; if(c && Date.now()-c.at < 3600e3) return c;
+  const grids = await Promise.all(MAPGRIDS.map(async g=>{
+    const lats=[], lons=[], nLat=Math.round((g.lat1-g.lat0)/g.step)+1, nLon=Math.round((g.lon1-g.lon0)/g.step)+1;
+    for(let i=0;i<nLat;i++) for(let j=0;j<nLon;j++){ lats.push(+(g.lat0+i*g.step).toFixed(2)); lons.push(+(g.lon0+j*g.step).toFixed(2)); }
+    const q = {latitude:lats.join(","), longitude:lons.join(","), forecast_days:7, temporal_resolution:"hourly_3", timezone:TZ};
+    const url = kind==="wind"
+      ? "https://api.open-meteo.com/v1/forecast?"+qs({...q, hourly:"wind_speed_10m,wind_direction_10m", wind_speed_unit:"kn", models:"ecmwf_ifs025"})
+      : "https://marine-api.open-meteo.com/v1/marine?"+qs({...q, hourly:"swell_wave_height,swell_wave_period,swell_wave_direction"});
+    const arr = await getJSON(url), list = Array.isArray(arr) ? arr : [arr];
+    const times = list[0].hourly.time, nT = times.length, nP = lats.length;
+    const keys = kind==="wind" ? {v:"wind_speed_10m", d:"wind_direction_10m"} : {v:"swell_wave_height", p:"swell_wave_period", d:"swell_wave_direction"};
+    const out = {...g, nLat, nLon, times};
+    for(const [k, name] of Object.entries(keys)){
+      const a = new Float32Array(nT*nP).fill(NaN);
+      list.forEach((loc, pi)=>{ const h = loc.hourly[name]; for(let t=0;t<nT;t++){ const v=h[t]; if(v!=null) a[t*nP+pi]=v; } });
+      out[k] = a;
+    }
+    // Direction en vecteur (pour interpoler proprement autour de 0/360°)
+    out.dx = out.d.map(v=>Math.sin(v*DEG)); out.dy = out.d.map(v=>Math.cos(v*DEG));
+    // Copie « étendue » pour la couleur : on prolonge la mer sous la côte, masquée ensuite par la terre
+    out.fill = {};
+    for(const k of Object.keys(keys)){ if(k==="d") continue; out.fill[k] = dilate(out[k], nT, nLat, nLon, 3); }
+    out.nP = nP;
+    return out;
+  }));
+  const res = {at:Date.now(), grids, times:grids[0].times};
+  MAP.data[kind] = res; return res;
+}
+function dilate(src, nT, nLat, nLon, passes){
+  let a = Float32Array.from(src); const nP = nLat*nLon;
+  for(let k=0;k<passes;k++){
+    const b = Float32Array.from(a);
+    for(let t=0;t<nT;t++) for(let i=0;i<nLat;i++) for(let j=0;j<nLon;j++){
+      const idx = t*nP+i*nLon+j; if(!isNaN(a[idx])) continue;
+      let s=0, n=0;
+      for(let di=-1;di<=1;di++) for(let dj=-1;dj<=1;dj++){ const ii=i+di, jj=j+dj; if(ii<0||jj<0||ii>=nLat||jj>=nLon) continue; const v=a[t*nP+ii*nLon+jj]; if(!isNaN(v)){ s+=v; n++; } }
+      if(n) b[idx]=s/n;
+    }
+    a = b;
+  }
+  return a;
+}
+// Interpolation bilinéaire ; renvoie {v, sea} (sea = part de mer autour du point)
+function sampleGrid(g, arr, ti, lat, lon){
+  const fy=(lat-g.lat0)/g.step, fx=(lon-g.lon0)/g.step;
+  if(fy<0 || fx<0 || fy>g.nLat-1 || fx>g.nLon-1) return null;
+  const i=Math.min(Math.floor(fy), g.nLat-2), j=Math.min(Math.floor(fx), g.nLon-2), y=fy-i, x=fx-j, o=ti*g.nP;
+  const c=[[i,j,(1-y)*(1-x)],[i,j+1,(1-y)*x],[i+1,j,y*(1-x)],[i+1,j+1,y*x]];
+  let s=0, w=0;
+  for(const [ii,jj,ww] of c){ const v=arr[o+ii*g.nLon+jj]; if(!isNaN(v)){ s+=v*ww; w+=ww; } }
+  return w>1e-6 ? {v:s/w, sea:w} : null;
+}
+function sampleAt(D, key, ti, lat, lon, filled){
+  for(const g of D.grids){
+    const r = sampleGrid(g, filled ? g.fill[key] : g[key], ti, lat, lon);
+    if(r && (filled || r.sea>0.5)) return r;
+  }
+  return null;
+}
+function dirAt(D, ti, lat, lon){
+  const x = sampleAt(D,"dx",ti,lat,lon), y = sampleAt(D,"dy",ti,lat,lon);
+  return x && y ? (Math.atan2(x.v, y.v)/DEG+360)%360 : null;
+}
+const layerKey = l => l==="wind" ? "wind" : "marine";
+const fieldKey = l => l==="period" ? "p" : "v";
+
+function drawMap(){
+  const m = MAP.map, D = MAP.data[layerKey(state.mapLayer)]; if(!m || !D) return;
+  const size = m.getSize(), W = size.x, Hh = size.y, dpr = window.devicePixelRatio || 1, cv = MAP.canvas;
+  cv.width = W*dpr; cv.height = Hh*dpr; cv.style.width = W+"px"; cv.style.height = Hh+"px";
+  L.DomUtil.setPosition(cv, m.containerPointToLayerPoint([0,0]));
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,Hh);
+  const pal = PAL[state.mapLayer], key = fieldKey(state.mapLayer), ti = MAP.ti;
+  // 1. Champ de couleur, calculé en basse résolution puis lissé
+  const S = 4, w = Math.ceil(W/S), h = Math.ceil(Hh/S), small = MAP.small || (MAP.small = document.createElement("canvas"));
+  small.width = w; small.height = h;
+  const sctx = small.getContext("2d"), img = sctx.createImageData(w, h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const ll = m.containerPointToLatLng([x*S+S/2, y*S+S/2]), r = sampleAt(D, key, ti, ll.lat, ll.lng, true), k = (y*w+x)*4;
+    if(!r) continue;
+    const c = palRgb(pal, r.v); img.data[k]=c[0]; img.data[k+1]=c[1]; img.data[k+2]=c[2]; img.data[k+3]=255;
+  }
+  sctx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(small, 0, 0, w*S, h*S);
+  // 2. Terre et côtes, nettes, par-dessus
+  if(MAP.land){
+    ctx.beginPath();
+    for(const ring of MAP.land){ ring.forEach(([lo,la],i)=>{ const pt = m.latLngToContainerPoint([la,lo]); i ? ctx.lineTo(pt.x,pt.y) : ctx.moveTo(pt.x,pt.y); }); ctx.closePath(); }
+    ctx.fillStyle = "#1c2731"; ctx.fill("evenodd");
+    ctx.strokeStyle = "rgba(220,235,245,.45)"; ctx.lineWidth = 0.8; ctx.stroke();
+  }
+  // 3. Flèches nettes sur une grille régulière d'écran
+  const G = W < 500 ? 46 : 54;
+  for(let y=G/2; y<Hh; y+=G) for(let x=G/2; x<W; x+=G){
+    const ll = m.containerPointToLatLng([x,y]), r = sampleAt(D, "v", ti, ll.lat, ll.lng), d = r ? dirAt(D, ti, ll.lat, ll.lng) : null;
+    if(!r || d==null || r.v < (state.mapLayer==="wind" ? 1 : 0.15)) continue;
+    let len;
+    if(state.mapLayer==="wind") len = clamp(10 + r.v*0.55, 10, 28);
+    else { const p = sampleAt(D, "p", ti, ll.lat, ll.lng); len = clamp(9 + ((p ? p.v : 8) - 6)*1.6, 9, 28); }
+    drawArrow(ctx, x, y, (d+180)%360, len);
+  }
+  // 4. Repères : quelques villes côtières pour se situer
+  ctx.font = "600 11px Barlow, system-ui, sans-serif";
+  for(const [name, la, lo, minZ] of PLACES){
+    if(m.getZoom() < minZ) continue;
+    const pt = m.latLngToContainerPoint([la, lo]);
+    if(pt.x<0 || pt.y<0 || pt.x>W || pt.y>Hh) continue;
+    ctx.fillStyle = "rgba(220,235,245,.55)"; ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.8, 0, 2*Math.PI); ctx.fill();
+    ctx.fillStyle = "rgba(220,235,245,.8)"; ctx.fillText(name, pt.x+5, pt.y+4);
+  }
+  // 5. Spots : favoris et spot affiché
+  for(const sp of SPOTS){
+    const cur = sp.id===state.spot; if(!cur && !(state.favs||[]).includes(sp.id)) continue;
+    const pt = m.latLngToContainerPoint([sp.lat, sp.lon]);
+    ctx.beginPath(); ctx.arc(pt.x, pt.y, cur?5.5:4, 0, 2*Math.PI); ctx.fillStyle = cur ? "#ffffff" : "#cfe3ee"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#0b1622"; ctx.stroke();
+    if(cur){ ctx.font = "700 12px Barlow, system-ui, sans-serif"; ctx.lineWidth = 3.5; ctx.strokeStyle = "rgba(11,22,34,.9)"; ctx.strokeText(sp.name, pt.x+9, pt.y+4); ctx.fillStyle = "#fff"; ctx.fillText(sp.name, pt.x+9, pt.y+4); }
+  }
+}
+function drawArrow(ctx, x, y, travelDeg, len){
+  ctx.save(); ctx.translate(x, y); ctx.rotate(travelDeg*DEG);
+  const t = len/2, head = Math.max(5, len*0.32);
+  for(const [col, wid] of [["rgba(8,16,24,.85)", 4.2], ["#ffffff", 1.9]]){
+    ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(0, t); ctx.lineTo(0, -t+1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-head*0.62, -t+head); ctx.lineTo(0, -t); ctx.lineTo(head*0.62, -t+head); ctx.stroke();
+  }
+  ctx.restore();
+}
+function renderMapLegend(){
+  const p = PAL[state.mapLayer], lo = p.stops[0][0], hi = p.stops[p.stops.length-1][0];
+  const grad = p.stops.map(([v,c])=>`${c} ${((v-lo)/(hi-lo)*100).toFixed(1)}%`).join(",");
+  document.getElementById("mapLegend").innerHTML = `<b>${p.name} (${p.unit})</b><div class="bar" style="background:linear-gradient(90deg,${grad})"></div><div class="ticks">${p.ticks.map(t=>`<span>${t}</span>`).join("")}</div>`;
+}
+function setMapTime(ti){
+  const D = MAP.data[layerKey(state.mapLayer)]; if(!D) return;
+  MAP.ti = clamp(ti, 0, D.times.length-1);
+  const t = tp(D.times[MAP.ti]), dt = new Date(t);
+  document.getElementById("mapSlider").value = MAP.ti;
+  document.getElementById("mapWhen").textContent = `${DAYS[dt.getUTCDay()]} ${dt.getUTCDate()} · ${dt.getUTCHours()}h`;
+  drawMap();
+}
+async function refreshMap(){
+  const load = document.getElementById("mapLoad");
+  try{
+    if(!window.L){
+      loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css");
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js");
+    }
+    if(!MAP.map){
+      const m = MAP.map = L.map("mapFrame", {center:[45.2,-7.5], zoom:5, minZoom:4, maxZoom:9, zoomControl:true, attributionControl:true, maxBounds:[[33,-36],[58,6]], worldCopyJump:false});
+      m.attributionControl.setPrefix("");
+      m.createPane("field").style.zIndex = 250;
+      m.createPane("labels").style.zIndex = 450; m.getPane("labels").style.pointerEvents = "none";
+      MAP.canvas = L.DomUtil.create("canvas", "", m.getPane("field"));
+      m.attributionControl.addAttribution("Open-Meteo · Natural Earth");
+      m.on("moveend zoomend resize", drawMap);
+      m.on("zoomstart", ()=>{ MAP.canvas.style.opacity = 0; });
+      m.on("zoomend", ()=>{ MAP.canvas.style.opacity = 1; });
+      m.on("click", e=>{
+        const D = MAP.data[layerKey(state.mapLayer)]; if(!D) return;
+        const {lat, lng} = e.latlng, ti = MAP.ti, d = dirAt(D, ti, lat, lng), v = sampleAt(D, "v", ti, lat, lng);
+        if(!v) return;
+        let html;
+        if(state.mapLayer==="wind") html = `<b>Vent ${Math.round(v.v)} nds</b>${d!=null?`<br>De ${card(d)} (${Math.round(d)}°)`:""}`;
+        else { const p = sampleAt(D, "p", ti, lat, lng); html = `<b>Houle ${v.v.toFixed(1)} m</b>${p?` · ${Math.round(p.v)} s`:""}${d!=null?`<br>De ${card(d)} (${Math.round(d)}°)`:""}${p?`<br>Énergie ${Math.round(0.49*v.v*v.v*p.v*p.v)} kJ`:""}`; }
+        L.popup({closeButton:false}).setLatLng(e.latlng).setContent(html).openOn(MAP.map);
+      });
+      // Côtes Natural Earth (1:50 m), limitées à la zone de la carte
+      (async ()=>{
+        await loadScript("https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js");
+        const topo = await getJSON("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-50m.json");
+        const geo = topojson.feature(topo, topo.objects.land), rings = [];
+        const polys = geo.geometry ? (geo.geometry.type==="Polygon" ? [geo.geometry.coordinates] : geo.geometry.coordinates) : geo.features.flatMap(f=>f.geometry.type==="Polygon"?[f.geometry.coordinates]:f.geometry.coordinates);
+        for(const poly of polys) for(const ring of poly){ if(ring.some(([lo,la])=>lo>-45 && lo<20 && la>28 && la<64)) rings.push(ring); }
+        MAP.land = rings; drawMap();
+      })().catch(err=>console.warn("Côtes non chargées :", err.message));
+    }
+    MAP.map.invalidateSize();
+    const kind = layerKey(state.mapLayer);
+    if(!MAP.data[kind] || Date.now()-MAP.data[kind].at >= 3600e3){ load.hidden = false; load.textContent = "Chargement de la carte…"; }
+    const D = await fetchLayerData(kind);
+    load.hidden = true;
+    const slider = document.getElementById("mapSlider"); slider.max = D.times.length-1;
+    if(!MAP.tiSet){ const now = nowNaive(); MAP.ti = Math.max(0, D.times.findIndex(t=>tp(t) + 1.5*H >= now)); MAP.tiSet = true; }
+    renderMapLegend(); setMapTime(MAP.ti);
+    const sp = SPOTS.find(x=>x.id===state.spot);
+    document.getElementById("windyLink").href = `https://www.windy.com/${sp.lat}/${sp.lon}?waves,${sp.lat},${sp.lon},6`;
+  }catch(err){
+    load.hidden = false; load.textContent = "Carte indisponible : " + err.message + ". Vérifie ta connexion.";
+  }
+}
+function stopMapAnim(){ clearInterval(MAP.timer); MAP.timer = null; const b = document.getElementById("mapPlay"); b.textContent = "▶"; b.setAttribute("aria-label","Lancer l'animation"); }
+document.getElementById("mapPlay").addEventListener("click", ()=>{
+  if(MAP.timer) return stopMapAnim();
+  const b = document.getElementById("mapPlay"); b.textContent = "❚❚"; b.setAttribute("aria-label","Mettre en pause");
+  MAP.timer = setInterval(()=>{ const D = MAP.data[layerKey(state.mapLayer)]; if(!D) return; setMapTime(MAP.ti+1 >= D.times.length ? 0 : MAP.ti+1); }, 550);
+});
+document.getElementById("mapSlider").addEventListener("input", e=>{ stopMapAnim(); setMapTime(+e.target.value); });
+
 function renderView(){
+  if(state.mapLayer!=="swell" && state.mapLayer!=="period" && state.mapLayer!=="wind") state.mapLayer = "swell";
   const map = state.view === "map";
   document.querySelectorAll("#viewTabs button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.view === state.view)));
   document.getElementById("mapView").hidden = !map;
   ["out","legend"].forEach(id=>document.getElementById(id).hidden = map);
   document.querySelector(".notes").hidden = map;
   document.querySelector(".controls").hidden = map;
-  if(!map) return;
+  if(!map){ if(MAP.timer) stopMapAnim(); return; }
   syncSeg("segLayer", state.mapLayer);
-  const spot = SPOTS.find(x=>x.id===state.spot), url = windyUrl(state.mapLayer, spot), box = document.getElementById("mapFrame");
-  const cur = box.querySelector("iframe");
-  if(!cur || cur.dataset.src !== url) box.innerHTML = `<iframe title="Carte de la houle et du vent sur l'Atlantique" data-src="${url}" src="${url}" loading="lazy" allowfullscreen></iframe>`;
+  refreshMap();
 }
 document.getElementById("viewTabs").addEventListener("click", e=>{ const b = e.target.closest("[data-view]"); if(!b) return; state.view = b.dataset.view; persist(); renderView(); });
 document.getElementById("segLayer").addEventListener("click", e=>{ const b = e.target.closest("button"); if(!b) return; state.mapLayer = b.dataset.v; persist(); renderView(); });
