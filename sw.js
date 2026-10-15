@@ -1,6 +1,6 @@
 // Service worker d'Olatu : l'appli s'ouvre même sans réseau, avec les dernières prévisions téléchargées.
 // Changer VERSION à chaque mise en ligne pour forcer la mise à jour du cache.
-const VERSION = "olatu-v11";
+const VERSION = "olatu-v12";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon.png"];
 
 self.addEventListener("install", e => {
@@ -17,7 +17,8 @@ self.addEventListener("activate", e => {
 async function networkFirst(req){
   const cache = await caches.open(VERSION);
   try{
-    const res = await fetch(req);
+    // no-cache : on redemande toujours au serveur si la page a changé (sinon le navigateur garde l'ancienne version 10 min)
+    const res = await fetch(req, new URL(req.url).origin === location.origin ? {cache:"no-cache"} : {});
     if(res.ok) cache.put(req, res.clone());
     return res;
   }catch(err){
