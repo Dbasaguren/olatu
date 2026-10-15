@@ -1,6 +1,6 @@
 // Service worker d'Olatu : l'appli s'ouvre même sans réseau, avec les dernières prévisions téléchargées.
 // Changer VERSION à chaque mise en ligne pour forcer la mise à jour du cache.
-const VERSION = "olatu-v13";
+const VERSION = "olatu-v14";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon.png"];
 
 self.addEventListener("install", e => {
@@ -43,5 +43,5 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
   // Polices et bibliothèque Supabase (version figée) : ne changent jamais
   if(url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com" || url.hostname === "cdn.jsdelivr.net" || url.hostname === "cdnjs.cloudflare.com") return e.respondWith(cacheFirst(req));
-  if(url.origin === location.origin || url.hostname.endsWith("open-meteo.com")) return e.respondWith(networkFirst(req));
+  if(url.origin === location.origin || url.hostname.endsWith("open-meteo.com") || url.hostname === "raw.githubusercontent.com") return e.respondWith(networkFirst(req));
 });

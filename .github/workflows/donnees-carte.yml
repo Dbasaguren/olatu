@@ -1,0 +1,45 @@
+# Prépare les données de la carte (houle et vent, monde entier) deux fois par jour,
+# après la sortie des modèles de 00 h et 12 h UTC, et les publie sur la branche « data ».
+# L'appli les lit sur https://raw.githubusercontent.com/<dépôt>/data/swell.json et wind.json.
+name: Données carte
+
+on:
+  schedule:
+    - cron: "20 5,17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: donnees-carte
+  cancel-in-progress: false
+
+jobs:
+  construire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Récupérer le masque terre/mer de la fois précédente
+        run: |
+          mkdir -p out
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/data/mask.json" -o out/mask.json || rm -f out/mask.json
+
+      - name: Télécharger les prévisions
+        run: python outils/construire_donnees_carte.py out
+
+      - name: Publier sur la branche data
+        run: |
+          cd out
+          git init -q -b data
+          git config user.name "olatu-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add swell.json wind.json mask.json
+          git commit -q -m "Données carte $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data

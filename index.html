@@ -317,7 +317,7 @@ td.bicho .bnorm{color:var(--muted)}
   <section id="mapView" hidden>
     <div class="map-bar">
       <div class="seg" id="segLayer"><button type="button" data-v="swell">Houle</button><button type="button" data-v="period">Période</button><button type="button" data-v="wind">Vent</button></div>
-      <a class="map-ext" id="windyLink" href="https://www.windy.com" target="_blank" rel="noopener">Voir aussi sur Windy ↗</a>
+      <div class="seg" id="segZoom"><button type="button" data-z="monde">Monde</button><button type="button" data-z="atlantique">Atlantique</button><button type="button" data-z="basque">Côte basque</button></div>
     </div>
     <div class="map-wrap">
       <div class="map-frame" id="mapFrame"></div>
@@ -329,7 +329,7 @@ td.bicho .bnorm{color:var(--muted)}
       <input type="range" id="mapSlider" min="0" max="0" value="0" aria-label="Moment de la prévision">
       <span class="map-when" id="mapWhen">–</span>
     </div>
-    <p class="pd-hint">Touche la carte pour lire les valeurs à un endroit. Les flèches indiquent où va la houle (ou le vent) ; plus elles sont longues, plus la période (ou le vent) est forte. Données Open-Meteo (modèles de vagues MFWAM / ECMWF, vent ECMWF), côtes Natural Earth. Appuie sur ▶ pour voir la houle arriver sur les 7 prochains jours.</p>
+    <p class="pd-hint">Touche la carte pour lire les valeurs à un endroit. Les flèches glissent dans le sens de la houle (ou du vent) : plus elles sont grandes, plus la houle est grosse ; plus elles vont vite, plus la période est longue. Appuie sur ▶ pour voir la houle traverser l'océan sur les 7 prochains jours. <span id="mapStamp"></span> Données Open-Meteo (vagues MFWAM / ECMWF WAM, vent ECMWF), côtes Natural Earth. <a id="windyLink" href="https://www.windy.com" target="_blank" rel="noopener">Comparer sur Windy ↗</a></p>
   </section>
   <div id="out"><div class="block"><div class="msg"><b>Chargement des prévisions…</b>Houle, vent et marée depuis Open-Meteo.</div></div></div>
 
@@ -1056,12 +1056,10 @@ document.getElementById("resetProf").addEventListener("click", ()=>{
   state.hidden = []; BLOCKS.forEach(([id])=>state.blocks[id] = true); renderPrefs(); applyAll();
 });
 
-// ---------- Onglet Carte : notre carte de houle et de vent ----------
-// Deux grilles de points Open-Meteo : large sur l'Atlantique, fine sur le golfe de Gascogne
-const MAPGRIDS = [
-  {lat0:42, lat1:48, lon0:-6, lon1:-1, step:0.5},
-  {lat0:34.5, lat1:57, lon0:-35, lon1:-0.5, step:1.5},
-];
+// ---------- Onglet Carte : houle et vent sur le monde entier ----------
+// Les données sont préparées deux fois par jour par GitHub Actions (outils/construire_donnees_carte.py)
+// et lues sur la branche « data » du dépôt : aucun appel à Open-Meteo depuis le téléphone.
+const MAP_DATA = "https://raw.githubusercontent.com/Dbasaguren/olatu/data/";
 const hex = h => [1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const PAL = {
   swell:  {name:"Hauteur de houle", unit:"m",   ticks:[0,1,2,3,4,6,8],     stops:[[0,"#0d1b4c"],[0.5,"#123f8c"],[1,"#1673b8"],[1.5,"#18a5b5"],[2,"#3cc47c"],[2.5,"#9bd94a"],[3,"#f2d43b"],[4,"#f59a2c"],[5,"#e8512f"],[6,"#c92a5a"],[8,"#8a2fc2"],[10,"#d1a8ff"]]},
@@ -1075,70 +1073,82 @@ function palRgb(p, v){
   for(let i=0;i<s.length-1;i++){ const a=s[i], b=s[i+1]; if(v<=b[0]){ const f=(v-a[0])/(b[0]-a[0]); return [a[1]+(b[1]-a[1])*f, a[2]+(b[2]-a[2])*f, a[3]+(b[3]-a[3])*f]; } }
   return s[s.length-1].slice(1);
 }
-const PLACES = [["Biarritz",43.48,-1.56,7],["Hossegor",43.66,-1.40,7],["Saint-Sébastien",43.32,-1.98,7],["Bilbao",43.26,-2.93,5],["Santander",43.46,-3.80,6],["Gijón",43.54,-5.66,6],["La Corogne",43.36,-8.41,5],["Lisbonne",38.72,-9.14,5],["Porto",41.15,-8.61,6],["Bordeaux",44.84,-0.58,5],["Arcachon",44.66,-1.17,7],["La Rochelle",46.16,-1.15,6],["Nantes",47.22,-1.55,6],["Brest",48.39,-4.49,5],["Cornouailles",50.2,-5.2,6],["Irlande",52.8,-8.0,4],["Açores",38.6,-28.0,4]];
-const MAP = {map:null, canvas:null, data:{}, land:null, ti:0, timer:null, loading:null};
+const PLACES = [["Biarritz",43.48,-1.56,7],["Hossegor",43.66,-1.40,7],["Saint-Sébastien",43.32,-1.98,7],["Bilbao",43.26,-2.93,5],["Santander",43.46,-3.80,6],["La Corogne",43.36,-8.41,5],["Lisbonne",38.72,-9.14,4],["Porto",41.15,-8.61,6],["Bordeaux",44.84,-0.58,5],["Brest",48.39,-4.49,5],["Irlande",52.8,-8.0,4],["Açores",38.6,-28.0,4],["Islande",64.9,-18.5,3],["Terre-Neuve",48.5,-56.0,3],["Antilles",16.5,-61.5,3],["Canaries",28.3,-16.5,4],["Maroc",31.8,-7.1,4],["Hawaï",20.8,-156.3,3],["Tahiti",-17.6,-149.4,3],["Bali",-8.4,115.2,3],["Australie",-25.0,134.0,2],["Afrique du Sud",-30.5,24.0,2],["Brésil",-10.0,-52.0,2],["Californie",36.5,-119.5,3],["Japon",36.2,138.3,3]];
+const VIEWS = {monde:[[25,-20],2], atlantique:[[42,-28],3], basque:[[43.7,-3],7]};
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const MAP = {map:null, canvas:null, data:{}, ti:0, timer:null};
+const FLOW = {canvas:null, parts:[], raf:0, running:false};
 
 function loadScript(src){ return new Promise((ok, ko)=>{ const t=document.createElement("script"); t.src=src; t.onload=ok; t.onerror=()=>ko(new Error("chargement impossible : "+src)); document.head.appendChild(t); }); }
 function loadCss(href){ const l=document.createElement("link"); l.rel="stylesheet"; l.href=href; document.head.appendChild(l); }
+const normLon = lo => ((lo+180)%360+360)%360-180;
 
-// Télécharge une couche (houle ou vent) sur les deux grilles ; null = terre
-async function fetchLayerData(kind){
-  const c = MAP.data[kind]; if(c && Date.now()-c.at < 3600e3) return c;
-  const grids = await Promise.all(MAPGRIDS.map(async g=>{
-    const lats=[], lons=[], nLat=Math.round((g.lat1-g.lat0)/g.step)+1, nLon=Math.round((g.lon1-g.lon0)/g.step)+1;
-    for(let i=0;i<nLat;i++) for(let j=0;j<nLon;j++){ lats.push(+(g.lat0+i*g.step).toFixed(2)); lons.push(+(g.lon0+j*g.step).toFixed(2)); }
-    const q = {latitude:lats.join(","), longitude:lons.join(","), forecast_days:7, temporal_resolution:"hourly_3", timezone:TZ};
-    const url = kind==="wind"
-      ? "https://api.open-meteo.com/v1/forecast?"+qs({...q, hourly:"wind_speed_10m,wind_direction_10m", wind_speed_unit:"kn", models:"ecmwf_ifs025"})
-      : "https://marine-api.open-meteo.com/v1/marine?"+qs({...q, hourly:"swell_wave_height,swell_wave_period,swell_wave_direction"});
-    const arr = await getJSON(url), list = Array.isArray(arr) ? arr : [arr];
-    const times = list[0].hourly.time, nT = times.length, nP = lats.length;
-    const keys = kind==="wind" ? {v:"wind_speed_10m", d:"wind_direction_10m"} : {v:"swell_wave_height", p:"swell_wave_period", d:"swell_wave_direction"};
-    const out = {...g, nLat, nLon, times};
-    for(const [k, name] of Object.entries(keys)){
-      const a = new Float32Array(nT*nP).fill(NaN);
-      list.forEach((loc, pi)=>{ const h = loc.hourly[name]; for(let t=0;t<nT;t++){ const v=h[t]; if(v!=null) a[t*nP+pi]=v; } });
-      out[k] = a;
-    }
-    // Direction en vecteur (pour interpoler proprement autour de 0/360°)
-    out.dx = out.d.map(v=>Math.sin(v*DEG)); out.dy = out.d.map(v=>Math.cos(v*DEG));
-    // Copie « étendue » pour la couleur : on prolonge la mer sous la côte, masquée ensuite par la terre
-    out.fill = {};
-    for(const k of Object.keys(keys)){ if(k==="d") continue; out.fill[k] = dilate(out[k], nT, nLat, nLon, 3); }
-    out.nP = nP;
-    return out;
-  }));
-  const res = {at:Date.now(), grids, times:grids[0].times};
-  MAP.data[kind] = res; return res;
-}
-function dilate(src, nT, nLat, nLon, passes){
+function dilate(src, nT, nLat, nLon, passes, wrap){
   let a = Float32Array.from(src); const nP = nLat*nLon;
   for(let k=0;k<passes;k++){
     const b = Float32Array.from(a);
     for(let t=0;t<nT;t++) for(let i=0;i<nLat;i++) for(let j=0;j<nLon;j++){
       const idx = t*nP+i*nLon+j; if(!isNaN(a[idx])) continue;
       let s=0, n=0;
-      for(let di=-1;di<=1;di++) for(let dj=-1;dj<=1;dj++){ const ii=i+di, jj=j+dj; if(ii<0||jj<0||ii>=nLat||jj>=nLon) continue; const v=a[t*nP+ii*nLon+jj]; if(!isNaN(v)){ s+=v; n++; } }
+      for(let di=-1;di<=1;di++) for(let dj=-1;dj<=1;dj++){
+        const ii=i+di; let jj=j+dj;
+        if(ii<0 || ii>=nLat) continue;
+        if(wrap) jj=(jj+nLon)%nLon; else if(jj<0 || jj>=nLon) continue;
+        const v=a[t*nP+ii*nLon+jj]; if(!isNaN(v)){ s+=v; n++; }
+      }
       if(n) b[idx]=s/n;
     }
     a = b;
   }
   return a;
 }
+// Lit swell.json ou wind.json (valeurs entières, -1 = terre) et prépare les grilles
+async function fetchLayerData(kind){
+  const c = MAP.data[kind]; if(c && Date.now()-c.at < 3600e3) return c;
+  const J = await getJSON(MAP_DATA + (kind==="wind" ? "wind.json" : "swell.json"));
+  const nT = J.times.length;
+  const dec = (arr, scale) => { const a = new Float32Array(arr.length); for(let i=0;i<arr.length;i++) a[i] = arr[i] < 0 ? NaN : arr[i]/scale; return a; };
+  const grids = J.grids.map(g=>{
+    const o = {id:g.id, lat0:g.lat0, lon0:g.lon0, step:g.step, nLat:g.nLat, nLon:g.nLon, nP:g.nLat*g.nLon, wrap:g.wrap};
+    if(kind==="wind"){ o.v = dec(g.v, 10); o.d = dec(g.d, 1); } else { o.v = dec(g.h, 100); o.p = dec(g.p, 10); o.d = dec(g.d, 1); }
+    o.dx = o.d.map(v=>Math.sin(v*DEG)); o.dy = o.d.map(v=>Math.cos(v*DEG));
+    const passes = g.wrap ? 1 : 3;
+    o.fill = {v: dilate(o.v, nT, o.nLat, o.nLon, passes, o.wrap)};
+    if(o.p) o.fill.p = dilate(o.p, nT, o.nLat, o.nLon, passes, o.wrap);
+    return o;
+  });
+  const res = {at:Date.now(), grids, times:J.times, generated:J.generated};
+  MAP.data[kind] = res; return res;
+}
 // Interpolation bilinéaire ; renvoie {v, sea} (sea = part de mer autour du point)
 function sampleGrid(g, arr, ti, lat, lon){
-  const fy=(lat-g.lat0)/g.step, fx=(lon-g.lon0)/g.step;
-  if(fy<0 || fx<0 || fy>g.nLat-1 || fx>g.nLon-1) return null;
-  const i=Math.min(Math.floor(fy), g.nLat-2), j=Math.min(Math.floor(fx), g.nLon-2), y=fy-i, x=fx-j, o=ti*g.nP;
-  const c=[[i,j,(1-y)*(1-x)],[i,j+1,(1-y)*x],[i+1,j,y*(1-x)],[i+1,j+1,y*x]];
+  const fy=(lat-g.lat0)/g.step; if(fy<0 || fy>g.nLat-1) return null;
+  let j, j1, x;
+  if(g.wrap){ const fx = ((lon-g.lon0)%360+360)%360/g.step; j = Math.floor(fx); x = fx-j; j %= g.nLon; j1 = (j+1)%g.nLon; }
+  else { const fx = (lon-g.lon0)/g.step; if(fx<0 || fx>g.nLon-1) return null; j = Math.min(Math.floor(fx), g.nLon-2); x = fx-j; j1 = j+1; }
+  const i=Math.min(Math.floor(fy), g.nLat-2), y=fy-i, o=ti*g.nP;
+  const c=[[i,j,(1-y)*(1-x)],[i,j1,(1-y)*x],[i+1,j,y*(1-x)],[i+1,j1,y*x]];
   let s=0, w=0;
   for(const [ii,jj,ww] of c){ const v=arr[o+ii*g.nLon+jj]; if(!isNaN(v)){ s+=v*ww; w+=ww; } }
-  return w>1e-6 ? {v:s/w, sea:w} : null;
+  // distance au bord de la grille, en mailles (pour fondre deux grilles entre elles)
+  const edge = g.wrap ? 99 : Math.min(fy, g.nLat-1-fy, (lon-g.lon0)/g.step, g.nLon-1-(lon-g.lon0)/g.step);
+  return w>1e-6 ? {v:s/w, sea:w, edge} : null;
 }
+const BLEND = 2;   // largeur du fondu entre une grille fine et la suivante, en mailles
 function sampleAt(D, key, ti, lat, lon, filled){
-  for(const g of D.grids){
-    const r = sampleGrid(g, filled ? g.fill[key] : g[key], ti, lat, lon);
-    if(r && (filled || r.sea>0.5)) return r;
+  lon = normLon(lon);
+  const gs = D.grids;
+  for(let k=0;k<gs.length;k++){
+    const r = sampleGrid(gs[k], filled ? gs[k].fill[key] : gs[k][key], ti, lat, lon);
+    if(!r || !(filled || r.sea>0.5)) continue;
+    // Près du bord de la grille fine : fondu progressif vers la grille plus large
+    if(r.edge < BLEND && k+1 < gs.length){
+      for(let n=k+1;n<gs.length;n++){
+        const r2 = sampleGrid(gs[n], filled ? gs[n].fill[key] : gs[n][key], ti, lat, lon);
+        if(r2 && (filled || r2.sea>0.5)){ const f = r.edge/BLEND; return {v:r.v*f + r2.v*(1-f), sea:r.sea}; }
+      }
+    }
+    return r;
   }
   return null;
 }
@@ -1146,15 +1156,40 @@ function dirAt(D, ti, lat, lon){
   const x = sampleAt(D,"dx",ti,lat,lon), y = sampleAt(D,"dy",ti,lat,lon);
   return x && y ? (Math.atan2(x.v, y.v)/DEG+360)%360 : null;
 }
-const layerKey = l => l==="wind" ? "wind" : "marine";
+const layerKey = l => l==="wind" ? "wind" : "swell";
 const fieldKey = l => l==="period" ? "p" : "v";
+const curData = () => MAP.data[layerKey(state.mapLayer)];
 
-function drawMap(){
-  const m = MAP.map, D = MAP.data[layerKey(state.mapLayer)]; if(!m || !D) return;
-  const size = m.getSize(), W = size.x, Hh = size.y, dpr = window.devicePixelRatio || 1, cv = MAP.canvas;
+// Côtes Natural Earth : 1:110 m vue de loin, 1:50 m de près
+function toRings(topo){
+  const geo = topojson.feature(topo, topo.objects.land);
+  const geoms = geo.features ? geo.features.map(f=>f.geometry) : [geo.geometry];
+  const rings = [];
+  for(const gm of geoms){ const polys = gm.type==="Polygon" ? [gm.coordinates] : gm.coordinates; for(const poly of polys) for(const r0 of poly){
+    // Contours qui traversent la ligne de changement de date : longitudes rendues continues (sinon trait à travers la carte)
+    const r = []; let prev = null;
+    for(const [lo0,la] of r0){ let lo = lo0; if(prev!==null){ while(lo-prev > 180) lo -= 360; while(lo-prev < -180) lo += 360; } r.push([lo,la]); prev = lo; }
+    let a=1e9,b=-1e9,c=1e9,d=-1e9; for(const [lo,la] of r){ if(lo<a)a=lo; if(lo>b)b=lo; if(la<c)c=la; if(la>d)d=la; }
+    rings.push({pts:r, minLo:a, maxLo:b, minLa:c, maxLa:d});
+  } }
+  return rings;
+}
+async function loadLand(){
+  await loadScript("https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js");
+  MAP.l110 = toRings(await getJSON("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-110m.json")); drawMap();
+  MAP.l50 = toRings(await getJSON("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-50m.json")); drawMap();
+}
+
+function placeCanvas(cv, W, Hh){
+  const dpr = window.devicePixelRatio || 1;
   cv.width = W*dpr; cv.height = Hh*dpr; cv.style.width = W+"px"; cv.style.height = Hh+"px";
-  L.DomUtil.setPosition(cv, m.containerPointToLayerPoint([0,0]));
-  const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,Hh);
+  L.DomUtil.setPosition(cv, MAP.map.containerPointToLayerPoint([0,0]));
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); return ctx;
+}
+function drawMap(){
+  const m = MAP.map, D = curData(); if(!m || !D) return;
+  const {x:W, y:Hh} = m.getSize(), ctx = placeCanvas(MAP.canvas, W, Hh);
+  ctx.clearRect(0,0,W,Hh);
   const pal = PAL[state.mapLayer], key = fieldKey(state.mapLayer), ti = MAP.ti;
   // 1. Champ de couleur, calculé en basse résolution puis lissé
   const S = 4, w = Math.ceil(W/S), h = Math.ceil(Hh/S), small = MAP.small || (MAP.small = document.createElement("canvas"));
@@ -1168,24 +1203,24 @@ function drawMap(){
   sctx.putImageData(img, 0, 0);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
   ctx.drawImage(small, 0, 0, w*S, h*S);
-  // 2. Terre et côtes, nettes, par-dessus
-  if(MAP.land){
+  // 2. Terre et côtes, nettes, par-dessus (copies du monde à gauche et à droite si besoin)
+  const land = m.getZoom() >= 4 && MAP.l50 ? MAP.l50 : MAP.l110;
+  if(land){
+    const bd = m.getBounds(), west = bd.getWest(), east = bd.getEast(), south = bd.getSouth(), north = bd.getNorth();
     ctx.beginPath();
-    for(const ring of MAP.land){ ring.forEach(([lo,la],i)=>{ const pt = m.latLngToContainerPoint([la,lo]); i ? ctx.lineTo(pt.x,pt.y) : ctx.moveTo(pt.x,pt.y); }); ctx.closePath(); }
-    ctx.fillStyle = "#1c2731"; ctx.fill("evenodd");
+    for(let off = -720; off <= 720; off += 360){   // chaque contour est testé sur plusieurs tours du monde
+      for(const r of land){
+        if(r.maxLo+off < west || r.minLo+off > east || r.maxLa < south || r.minLa > north) continue;
+        r.pts.forEach(([lo,la],i)=>{ const pt = m.latLngToContainerPoint([la, lo+off]); i ? ctx.lineTo(pt.x,pt.y) : ctx.moveTo(pt.x,pt.y); });
+        ctx.closePath();
+      }
+    }
+    ctx.fillStyle = "#1c2731"; ctx.fill("nonzero");   // nonzero : deux copies superposées du même continent ne s'annulent pas
     ctx.strokeStyle = "rgba(220,235,245,.45)"; ctx.lineWidth = 0.8; ctx.stroke();
   }
-  // 3. Flèches nettes sur une grille régulière d'écran
-  const G = W < 500 ? 46 : 54;
-  for(let y=G/2; y<Hh; y+=G) for(let x=G/2; x<W; x+=G){
-    const ll = m.containerPointToLatLng([x,y]), r = sampleAt(D, "v", ti, ll.lat, ll.lng), d = r ? dirAt(D, ti, ll.lat, ll.lng) : null;
-    if(!r || d==null || r.v < (state.mapLayer==="wind" ? 1 : 0.15)) continue;
-    let len;
-    if(state.mapLayer==="wind") len = clamp(10 + r.v*0.55, 10, 28);
-    else { const p = sampleAt(D, "p", ti, ll.lat, ll.lng); len = clamp(9 + ((p ? p.v : 8) - 6)*1.6, 9, 28); }
-    drawArrow(ctx, x, y, (d+180)%360, len);
-  }
-  // 4. Repères : quelques villes côtières pour se situer
+  // 3. Sans animation (réglage « réduire les animations ») : flèches fixes
+  if(REDUCED) staticArrows(ctx, D, W, Hh);
+  // 4. Repères et spots
   ctx.font = "600 11px Barlow, system-ui, sans-serif";
   for(const [name, la, lo, minZ] of PLACES){
     if(m.getZoom() < minZ) continue;
@@ -1194,31 +1229,73 @@ function drawMap(){
     ctx.fillStyle = "rgba(220,235,245,.55)"; ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.8, 0, 2*Math.PI); ctx.fill();
     ctx.fillStyle = "rgba(220,235,245,.8)"; ctx.fillText(name, pt.x+5, pt.y+4);
   }
-  // 5. Spots : favoris et spot affiché
   for(const sp of SPOTS){
     const cur = sp.id===state.spot; if(!cur && !(state.favs||[]).includes(sp.id)) continue;
+    if(m.getZoom() < 5 && !cur) continue;
     const pt = m.latLngToContainerPoint([sp.lat, sp.lon]);
     ctx.beginPath(); ctx.arc(pt.x, pt.y, cur?5.5:4, 0, 2*Math.PI); ctx.fillStyle = cur ? "#ffffff" : "#cfe3ee"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#0b1622"; ctx.stroke();
     if(cur){ ctx.font = "700 12px Barlow, system-ui, sans-serif"; ctx.lineWidth = 3.5; ctx.strokeStyle = "rgba(11,22,34,.9)"; ctx.strokeText(sp.name, pt.x+9, pt.y+4); ctx.fillStyle = "#fff"; ctx.fillText(sp.name, pt.x+9, pt.y+4); }
   }
 }
-function drawArrow(ctx, x, y, travelDeg, len){
+function arrowGlyph(ctx, x, y, travelDeg, len, alpha){
   ctx.save(); ctx.translate(x, y); ctx.rotate(travelDeg*DEG);
-  const t = len/2, head = Math.max(5, len*0.32);
-  for(const [col, wid] of [["rgba(8,16,24,.85)", 4.2], ["#ffffff", 1.9]]){
+  const t = len/2, head = Math.max(4.5, len*0.34);
+  for(const [col, wid] of [[`rgba(6,14,22,${(0.75*alpha).toFixed(3)})`, 3.6], [`rgba(255,255,255,${alpha.toFixed(3)})`, 1.7]]){
     ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.beginPath(); ctx.moveTo(0, t); ctx.lineTo(0, -t+1); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-head*0.62, -t+head); ctx.lineTo(0, -t); ctx.lineTo(head*0.62, -t+head); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, t); ctx.lineTo(0, -t+1); ctx.moveTo(-head*0.6, -t+head); ctx.lineTo(0, -t); ctx.lineTo(head*0.6, -t+head); ctx.stroke();
   }
   ctx.restore();
 }
+// Taille et vitesse d'une flèche selon la houle (hauteur, période) ou le vent
+function flowStyle(D, ti, lat, lon, v){
+  if(state.mapLayer==="wind") return {len: 8 + clamp(v*0.35, 0, 13), speed: 0.25 + clamp(v*0.035, 0, 1.4)};
+  const p = sampleAt(D, "p", ti, lat, lon), per = p ? p.v : 8;
+  return {len: 9 + clamp(v*2.4, 0, 13), speed: 0.2 + clamp((per-5)*0.075, 0, 1.4)};
+}
+function staticArrows(ctx, D, W, Hh){
+  const m = MAP.map, G = W < 500 ? 46 : 54;
+  for(let y=G/2; y<Hh; y+=G) for(let x=G/2; x<W; x+=G){
+    const ll = m.containerPointToLatLng([x,y]), r = sampleAt(D, "v", MAP.ti, ll.lat, ll.lng), d = r ? dirAt(D, MAP.ti, ll.lat, ll.lng) : null;
+    if(!r || d==null) continue;
+    arrowGlyph(ctx, x, y, (d+180)%360, flowStyle(D, MAP.ti, ll.lat, ll.lng, r.v).len, 1);
+  }
+}
+// ---- Flèches animées : elles glissent dans le sens de la houle, apparaissent et s'effacent ----
+function spawn(p, W, Hh){ p.x = Math.random()*W; p.y = Math.random()*Hh; p.age = 0; p.life = 90 + Math.random()*110; }
+function flowReset(){
+  if(!MAP.map || REDUCED) return;
+  const {x:W, y:Hh} = MAP.map.getSize(), n = Math.round(clamp(W*Hh/2300, 120, 520));
+  placeCanvas(FLOW.canvas, W, Hh);
+  FLOW.parts = Array.from({length:n}, ()=>{ const p = {}; spawn(p, W, Hh); p.age = Math.random()*p.life; return p; });
+  FLOW.canvas.style.opacity = 1; FLOW.running = true;
+  if(!FLOW.raf) FLOW.raf = requestAnimationFrame(flowTick);
+}
+function flowPause(){ FLOW.running = false; if(FLOW.canvas) FLOW.canvas.style.opacity = 0; }
+function flowStop(){ flowPause(); cancelAnimationFrame(FLOW.raf); FLOW.raf = 0; }
+function flowTick(){
+  FLOW.raf = requestAnimationFrame(flowTick);
+  if(!FLOW.running || document.hidden) return;
+  const m = MAP.map, D = curData(); if(!m || !D) return;
+  const {x:W, y:Hh} = m.getSize(), ctx = FLOW.canvas.getContext("2d"), dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,Hh);
+  const ti = MAP.ti, minV = state.mapLayer==="wind" ? 1 : 0.1;
+  for(const p of FLOW.parts){
+    const ll = m.containerPointToLatLng([p.x, p.y]), r = sampleAt(D, "v", ti, ll.lat, ll.lng), d = r ? dirAt(D, ti, ll.lat, ll.lng) : null;
+    if(!r || d==null || r.v < minV){ spawn(p, W, Hh); continue; }
+    const st = flowStyle(D, ti, ll.lat, ll.lng, r.v), tr = ((d+180)%360)*DEG;
+    p.x += Math.sin(tr)*st.speed; p.y -= Math.cos(tr)*st.speed; p.age++;
+    if(p.age > p.life || p.x<-20 || p.y<-20 || p.x>W+20 || p.y>Hh+20){ spawn(p, W, Hh); continue; }
+    arrowGlyph(ctx, p.x, p.y, (d+180)%360, st.len, Math.sin(Math.PI*p.age/p.life)*0.95);
+  }
+}
+
 function renderMapLegend(){
   const p = PAL[state.mapLayer], lo = p.stops[0][0], hi = p.stops[p.stops.length-1][0];
   const grad = p.stops.map(([v,c])=>`${c} ${((v-lo)/(hi-lo)*100).toFixed(1)}%`).join(",");
   document.getElementById("mapLegend").innerHTML = `<b>${p.name} (${p.unit})</b><div class="bar" style="background:linear-gradient(90deg,${grad})"></div><div class="ticks">${p.ticks.map(t=>`<span>${t}</span>`).join("")}</div>`;
 }
 function setMapTime(ti){
-  const D = MAP.data[layerKey(state.mapLayer)]; if(!D) return;
+  const D = curData(); if(!D) return;
   MAP.ti = clamp(ti, 0, D.times.length-1);
   const t = tp(D.times[MAP.ti]), dt = new Date(t);
   document.getElementById("mapSlider").value = MAP.ti;
@@ -1233,17 +1310,19 @@ async function refreshMap(){
       await loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js");
     }
     if(!MAP.map){
-      const m = MAP.map = L.map("mapFrame", {center:[45.2,-7.5], zoom:5, minZoom:4, maxZoom:9, zoomControl:true, attributionControl:true, maxBounds:[[33,-36],[58,6]], worldCopyJump:false});
-      m.attributionControl.setPrefix("");
+      const [c, z] = VIEWS.atlantique;
+      const m = MAP.map = L.map("mapFrame", {center:c, zoom:z, minZoom:2, maxZoom:9, worldCopyJump:true, zoomControl:true});
+      m.attributionControl.setPrefix(""); m.attributionControl.addAttribution("Open-Meteo · Natural Earth");
       m.createPane("field").style.zIndex = 250;
-      m.createPane("labels").style.zIndex = 450; m.getPane("labels").style.pointerEvents = "none";
+      m.createPane("flow").style.zIndex = 260; m.getPane("flow").style.pointerEvents = "none";
       MAP.canvas = L.DomUtil.create("canvas", "", m.getPane("field"));
-      m.attributionControl.addAttribution("Open-Meteo · Natural Earth");
-      m.on("moveend zoomend resize", drawMap);
+      FLOW.canvas = L.DomUtil.create("canvas", "", m.getPane("flow"));
+      m.on("movestart zoomstart", flowPause);
       m.on("zoomstart", ()=>{ MAP.canvas.style.opacity = 0; });
-      m.on("zoomend", ()=>{ MAP.canvas.style.opacity = 1; });
+      m.on("moveend", ()=>{ MAP.canvas.style.opacity = 1; drawMap(); flowReset(); });
+      m.on("resize", ()=>{ drawMap(); flowReset(); });
       m.on("click", e=>{
-        const D = MAP.data[layerKey(state.mapLayer)]; if(!D) return;
+        const D = curData(); if(!D) return;
         const {lat, lng} = e.latlng, ti = MAP.ti, d = dirAt(D, ti, lat, lng), v = sampleAt(D, "v", ti, lat, lng);
         if(!v) return;
         let html;
@@ -1251,15 +1330,7 @@ async function refreshMap(){
         else { const p = sampleAt(D, "p", ti, lat, lng); html = `<b>Houle ${v.v.toFixed(1)} m</b>${p?` · ${Math.round(p.v)} s`:""}${d!=null?`<br>De ${card(d)} (${Math.round(d)}°)`:""}${p?`<br>Énergie ${Math.round(0.49*v.v*v.v*p.v*p.v)} kJ`:""}`; }
         L.popup({closeButton:false}).setLatLng(e.latlng).setContent(html).openOn(MAP.map);
       });
-      // Côtes Natural Earth (1:50 m), limitées à la zone de la carte
-      (async ()=>{
-        await loadScript("https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js");
-        const topo = await getJSON("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-50m.json");
-        const geo = topojson.feature(topo, topo.objects.land), rings = [];
-        const polys = geo.geometry ? (geo.geometry.type==="Polygon" ? [geo.geometry.coordinates] : geo.geometry.coordinates) : geo.features.flatMap(f=>f.geometry.type==="Polygon"?[f.geometry.coordinates]:f.geometry.coordinates);
-        for(const poly of polys) for(const ring of poly){ if(ring.some(([lo,la])=>lo>-45 && lo<20 && la>28 && la<64)) rings.push(ring); }
-        MAP.land = rings; drawMap();
-      })().catch(err=>console.warn("Côtes non chargées :", err.message));
+      loadLand().catch(err=>console.warn("Côtes non chargées :", err.message));
     }
     MAP.map.invalidateSize();
     const kind = layerKey(state.mapLayer);
@@ -1268,9 +1339,11 @@ async function refreshMap(){
     load.hidden = true;
     const slider = document.getElementById("mapSlider"); slider.max = D.times.length-1;
     if(!MAP.tiSet){ const now = nowNaive(); MAP.ti = Math.max(0, D.times.findIndex(t=>tp(t) + 1.5*H >= now)); MAP.tiSet = true; }
-    renderMapLegend(); setMapTime(MAP.ti);
+    const g = D.generated ? new Date(D.generated.replace("Z",":00Z")) : null;
+    document.getElementById("mapStamp").textContent = g ? `Prévisions préparées le ${g.toLocaleDateString("fr-FR",{day:"numeric",month:"short"})} à ${g.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}.` : "";
     const sp = SPOTS.find(x=>x.id===state.spot);
     document.getElementById("windyLink").href = `https://www.windy.com/${sp.lat}/${sp.lon}?waves,${sp.lat},${sp.lon},6`;
+    renderMapLegend(); setMapTime(MAP.ti); flowReset();
   }catch(err){
     load.hidden = false; load.textContent = "Carte indisponible : " + err.message + ". Vérifie ta connexion.";
   }
@@ -1279,9 +1352,10 @@ function stopMapAnim(){ clearInterval(MAP.timer); MAP.timer = null; const b = do
 document.getElementById("mapPlay").addEventListener("click", ()=>{
   if(MAP.timer) return stopMapAnim();
   const b = document.getElementById("mapPlay"); b.textContent = "❚❚"; b.setAttribute("aria-label","Mettre en pause");
-  MAP.timer = setInterval(()=>{ const D = MAP.data[layerKey(state.mapLayer)]; if(!D) return; setMapTime(MAP.ti+1 >= D.times.length ? 0 : MAP.ti+1); }, 550);
+  MAP.timer = setInterval(()=>{ const D = curData(); if(!D) return; setMapTime(MAP.ti+1 >= D.times.length ? 0 : MAP.ti+1); }, 700);
 });
 document.getElementById("mapSlider").addEventListener("input", e=>{ stopMapAnim(); setMapTime(+e.target.value); });
+document.getElementById("segZoom").addEventListener("click", e=>{ const b = e.target.closest("[data-z]"); if(!b || !MAP.map) return; const [c, z] = VIEWS[b.dataset.z]; MAP.map.flyTo(c, z, {duration:0.8}); });
 
 function renderView(){
   if(state.mapLayer!=="swell" && state.mapLayer!=="period" && state.mapLayer!=="wind") state.mapLayer = "swell";
@@ -1291,7 +1365,7 @@ function renderView(){
   ["out","legend"].forEach(id=>document.getElementById(id).hidden = map);
   document.querySelector(".notes").hidden = map;
   document.querySelector(".controls").hidden = map;
-  if(!map){ if(MAP.timer) stopMapAnim(); return; }
+  if(!map){ if(MAP.timer) stopMapAnim(); flowStop(); return; }
   syncSeg("segLayer", state.mapLayer);
   refreshMap();
 }
