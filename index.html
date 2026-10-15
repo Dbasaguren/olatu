@@ -40,6 +40,7 @@
   --off:#2f7a52; --cross:#6b5d2a; --on:#8a3a30; --off-ink:#e6fff1; --on-ink:#ffe3de;
   --tide-fill:rgba(79,193,204,.18); --tide-line:#4fc1cc; --star:#f2c14e; color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-ui)}
 .wrap{max-width:1500px;margin:0 auto;padding-inline:max(20px, env(safe-area-inset-left));padding-block:max(18px, env(safe-area-inset-top)) max(40px, env(safe-area-inset-bottom))}
 header.top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:space-between}
@@ -203,6 +204,16 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .sempty{color:var(--muted);font-size:13.5px;padding:6px 0}
 /* Espace entre la synthèse et les blocs détaillés */
 .block.synth{margin-bottom:36px}
+/* Onglets Prévisions / Carte */
+.viewtabs{display:flex;gap:4px;margin-top:18px;border-bottom:1px solid var(--line-strong)}
+.viewtabs button{border:0;background:none;padding:9px 16px;font-weight:700;font-size:15px;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.viewtabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+#mapView{margin-top:14px}
+.map-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.map-hint{color:var(--muted);font-size:13px}
+.map-frame{height:max(420px, calc(100vh - 300px));border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.map-frame iframe{width:100%;height:100%;border:0;display:block}
+@media (max-width:640px){.map-frame{margin-inline:-14px;border-radius:0;border-inline:0;height:calc(100vh - 250px)}}
 /* Bichomètre */
 td.bicho{height:auto;padding:5px 4px;font:500 12px/1.2 var(--f-ui);white-space:normal}
 td.bicho .bb1{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--g-fun);color:#fff;font-weight:700;animation:bb1 1.6s ease-in-out infinite}
@@ -286,6 +297,18 @@ td.bicho .bnorm{color:var(--muted)}
     </div>
   </section>
 
+  <div class="viewtabs" id="viewTabs" role="tablist" aria-label="Affichage">
+    <button type="button" role="tab" data-view="fc">Prévisions</button>
+    <button type="button" role="tab" data-view="map">Carte</button>
+  </div>
+  <section id="mapView" hidden>
+    <div class="map-bar">
+      <div class="seg" id="segLayer"><button type="button" data-v="waves">Vagues</button><button type="button" data-v="swell1">Houle principale</button><button type="button" data-v="wind">Vent</button></div>
+      <span class="map-hint">Appuie sur ▶ en bas de la carte pour voir la houle arriver sur les prochains jours.</span>
+    </div>
+    <div class="map-frame" id="mapFrame"></div>
+    <p class="pd-hint">Carte fournie par <a href="https://www.windy.com" target="_blank" rel="noopener">Windy.com</a> (modèle de vagues ECMWF). Le point marque le spot sélectionné.</p>
+  </section>
   <div id="out"><div class="block"><div class="msg"><b>Chargement des prévisions…</b>Houle, vent et marée depuis Open-Meteo.</div></div></div>
 
   <section class="legend" id="legend"></section>
@@ -438,7 +461,7 @@ const GROUPS = [
   {id:"fun",   name:"Fun",    rows:[["bicho","Bichomètre"]]},
 ];
 const BLOCKS = [["wavecmp","Houle · comparaison des modèles"], ...WIND_MODELS.map(m=>[m.id, m.name+" · "+m.info])];
-const defaultPrefs = () => ({favs:["cenitz"], theme:"auto", sessions:[], spot:"cenitz", step:3, days:7, night:"hide", hidden:[], open:{}, blocks:{wavecmp:true, meteofrance_arome_france_hd:true, ecmwf_ifs:true}});
+const defaultPrefs = () => ({view:"fc", mapLayer:"waves", favs:["cenitz"], theme:"auto", sessions:[], spot:"cenitz", step:3, days:7, night:"hide", hidden:[], open:{}, blocks:{wavecmp:true, meteofrance_arome_france_hd:true, ecmwf_ifs:true}});
 // Profils enregistrés sur cet appareil (la synchro entre appareils viendra avec la mise en ligne)
 let store = load("profiles", null);
 if(!store || !store.users || !store.users[store.current]){
@@ -934,14 +957,14 @@ async function show(force){
 document.getElementById("spots").addEventListener("click", e=>{
   if(e.target.closest("#allSpots")){ renderSpotPicker(); spotsDlg.showModal(); return; }
   const b = e.target.closest(".spot"); if(!b) return;
-  state.spot = b.dataset.id; persist(); renderSpots(); show(false);
+  state.spot = b.dataset.id; persist(); renderSpots(); renderView(); show(false);
 });
 spotsDlg.addEventListener("click", e=>{
   if(e.target===spotsDlg || e.target.closest("[data-close]")) return spotsDlg.close();
   const f = e.target.closest("[data-fav]");
   if(f){ const id = f.dataset.fav; state.favs = (state.favs||[]).includes(id) ? state.favs.filter(x=>x!==id) : [...(state.favs||[]), id]; persist(); renderSpotPicker(); renderSpots(); return; }
   const g = e.target.closest("[data-go]");
-  if(g){ state.spot = g.dataset.go; persist(); renderSpots(); spotsDlg.close(); show(false); }
+  if(g){ state.spot = g.dataset.go; persist(); renderSpots(); renderView(); spotsDlg.close(); show(false); }
 });
 [["segStep","step",Number],["segDays","days",Number],["segNight","night",String]].forEach(([id,key,cast])=>{
   document.getElementById(id).addEventListener("click", e=>{
@@ -979,7 +1002,7 @@ function applyTheme(){
   renderLegend();
 }
 document.getElementById("segTheme").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; state.theme = b.dataset.v; syncSeg("segTheme", state.theme); applyAll(); });
-function applyAll(){ applyTheme(); persist(); renderWho(); renderSpots(); syncControls(); if(last && last.spot.id===state.spot) render(last.spot, last.data); else show(false); }
+function applyAll(){ applyTheme(); persist(); renderWho(); renderSpots(); syncControls(); renderView(); if(last && last.spot.id===state.spot) render(last.spot, last.data); else show(false); }
 const dlg = document.getElementById("prefs");
 const openPrefs = () => { renderPrefs(); dlg.showModal(); };
 document.getElementById("custom").addEventListener("click", openPrefs);
@@ -1011,7 +1034,30 @@ document.getElementById("resetProf").addEventListener("click", ()=>{
   state.hidden = []; BLOCKS.forEach(([id])=>state.blocks[id] = true); renderPrefs(); applyAll();
 });
 
-applyTheme(); renderWho(); renderSpots(); syncControls(); show(false);
+// ---------- Onglet Carte (Windy) ----------
+function windyUrl(layer, spot){
+  const q = {lat:44.5, lon:-6.5, detailLat:spot.lat, detailLon:spot.lon, zoom:5, level:"surface", overlay:layer,
+    product: layer==="wind" ? "ecmwf" : "ecmwfWaves", menu:"", message:"true", marker:"true", calendar:"now",
+    type:"map", location:"coordinates", metricWind:"kt", metricTemp:"°C"};
+  return "https://embed.windy.com/embed2.html?" + qs(q);
+}
+function renderView(){
+  const map = state.view === "map";
+  document.querySelectorAll("#viewTabs button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.view === state.view)));
+  document.getElementById("mapView").hidden = !map;
+  ["out","legend"].forEach(id=>document.getElementById(id).hidden = map);
+  document.querySelector(".notes").hidden = map;
+  document.querySelector(".controls").hidden = map;
+  if(!map) return;
+  syncSeg("segLayer", state.mapLayer);
+  const spot = SPOTS.find(x=>x.id===state.spot), url = windyUrl(state.mapLayer, spot), box = document.getElementById("mapFrame");
+  const cur = box.querySelector("iframe");
+  if(!cur || cur.dataset.src !== url) box.innerHTML = `<iframe title="Carte de la houle et du vent sur l'Atlantique" data-src="${url}" src="${url}" loading="lazy" allowfullscreen></iframe>`;
+}
+document.getElementById("viewTabs").addEventListener("click", e=>{ const b = e.target.closest("[data-view]"); if(!b) return; state.view = b.dataset.view; persist(); renderView(); });
+document.getElementById("segLayer").addEventListener("click", e=>{ const b = e.target.closest("button"); if(!b) return; state.mapLayer = b.dataset.v; persist(); renderView(); });
+
+applyTheme(); renderWho(); renderSpots(); syncControls(); renderView(); show(false);
 
 
 // ---------- Compte : connexion, synchronisation ----------
