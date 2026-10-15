@@ -3,3 +3,4 @@ __pycache__/
 *.json.bak
 socoa_hourly.json
 brest_hourly.json
+outils-maree/donnees/
