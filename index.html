@@ -1074,7 +1074,7 @@ function palRgb(p, v){
   return s[s.length-1].slice(1);
 }
 const PLACES = [["Biarritz",43.48,-1.56,7],["Hossegor",43.66,-1.40,7],["Saint-Sébastien",43.32,-1.98,7],["Bilbao",43.26,-2.93,5],["Santander",43.46,-3.80,6],["La Corogne",43.36,-8.41,5],["Lisbonne",38.72,-9.14,4],["Porto",41.15,-8.61,6],["Bordeaux",44.84,-0.58,5],["Brest",48.39,-4.49,5],["Irlande",52.8,-8.0,4],["Açores",38.6,-28.0,4],["Islande",64.9,-18.5,3],["Terre-Neuve",48.5,-56.0,3],["Antilles",16.5,-61.5,3],["Canaries",28.3,-16.5,4],["Maroc",31.8,-7.1,4],["Hawaï",20.8,-156.3,3],["Tahiti",-17.6,-149.4,3],["Bali",-8.4,115.2,3],["Australie",-25.0,134.0,2],["Afrique du Sud",-30.5,24.0,2],["Brésil",-10.0,-52.0,2],["Californie",36.5,-119.5,3],["Japon",36.2,138.3,3]];
-const VIEWS = {monde:[[25,-20],2], atlantique:[[42,-28],3], basque:[[43.7,-3],7]};
+const VIEWS = {monde:[[20,-20],2], atlantique:[[42,-28],3], basque:[[43.7,-3],7]};
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const MAP = {map:null, canvas:null, data:{}, ti:0, timer:null};
 const FLOW = {canvas:null, parts:[], raf:0, running:false};
@@ -1112,7 +1112,8 @@ async function fetchLayerData(kind){
     const o = {id:g.id, lat0:g.lat0, lon0:g.lon0, step:g.step, nLat:g.nLat, nLon:g.nLon, nP:g.nLat*g.nLon, wrap:g.wrap};
     if(kind==="wind"){ o.v = dec(g.v, 10); o.d = dec(g.d, 1); } else { o.v = dec(g.h, 100); o.p = dec(g.p, 10); o.d = dec(g.d, 1); }
     o.dx = o.d.map(v=>Math.sin(v*DEG)); o.dy = o.d.map(v=>Math.cos(v*DEG));
-    const passes = g.wrap ? 1 : 3;
+    // Comble les trous près des côtes (et les petites mers) avec les valeurs voisines ; la terre est dessinée par-dessus
+    const passes = g.wrap ? 3 : 2;
     o.fill = {v: dilate(o.v, nT, o.nLat, o.nLon, passes, o.wrap)};
     if(o.p) o.fill.p = dilate(o.p, nT, o.nLat, o.nLon, passes, o.wrap);
     return o;
@@ -1311,7 +1312,11 @@ async function refreshMap(){
     }
     if(!MAP.map){
       const [c, z] = VIEWS.atlantique;
-      const m = MAP.map = L.map("mapFrame", {center:c, zoom:z, minZoom:2, maxZoom:9, worldCopyJump:true, zoomControl:true});
+      // La carte ne peut pas sortir du monde : ni au-delà des pôles, ni trop loin sur les côtés
+      const m = MAP.map = L.map("mapFrame", {center:c, zoom:z, minZoom:2, maxZoom:9, worldCopyJump:true, zoomControl:true,
+        maxBounds:[[-78,-200],[82,200]], maxBoundsViscosity:1});
+      const fitMinZoom = () => { const z0 = m.getBoundsZoom([[-78,-200],[82,200]], true); m.setMinZoom(Math.max(2, Math.ceil(z0))); };
+      fitMinZoom(); m.on("resize", fitMinZoom);
       m.attributionControl.setPrefix(""); m.attributionControl.addAttribution("Open-Meteo · Natural Earth");
       m.createPane("field").style.zIndex = 250;
       m.createPane("flow").style.zIndex = 260; m.getPane("flow").style.pointerEvents = "none";

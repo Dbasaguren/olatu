@@ -3,7 +3,8 @@
 Lancé automatiquement par GitHub Actions deux fois par jour (.github/workflows/donnees-carte.yml).
 Usage : python construire_donnees_carte.py DOSSIER_SORTIE
 
-Trois grilles, de la plus fine à la plus large : golfe de Gascogne (0,5°), Atlantique Nord (1,5°), monde (5°).
+Grilles, de la plus fine à la plus large : golfe de Gascogne (0,5°), Atlantique Nord (1,5°),
+Méditerranée et mer du Nord / Baltique (1°, houle seulement), monde jusqu'aux pôles (5°).
 Seuls les points en mer sont demandés (masque terre/mer gardé dans mask.json d'une fois sur l'autre),
 pour rester sous les limites de l'API gratuite d'Open-Meteo.
 Fichiers produits : swell.json (houle), wind.json (vent), mask.json.
@@ -16,13 +17,16 @@ from datetime import datetime, timezone
 OUT = sys.argv[1] if len(sys.argv) > 1 else "out"
 os.makedirs(OUT, exist_ok=True)
 
+# wind=False : pas de vent sur cette grille (la grille monde suffit), pour rester dans le quota
 GRIDS = [
-    {"id": "biscay", "lat0": 42.0, "lat1": 48.0, "lon0": -6.0, "lon1": -1.0, "step": 0.5, "wrap": False},
-    {"id": "atl", "lat0": 34.5, "lat1": 57.0, "lon0": -35.0, "lon1": -0.5, "step": 1.5, "wrap": False},
-    {"id": "world", "lat0": -70.0, "lat1": 70.0, "lon0": -180.0, "lon1": 175.0, "step": 5.0, "wrap": True},
+    {"id": "biscay", "lat0": 42.0, "lat1": 48.0, "lon0": -6.0, "lon1": -1.0, "step": 0.5, "wrap": False, "wind": True},
+    {"id": "atl", "lat0": 34.5, "lat1": 57.0, "lon0": -35.0, "lon1": -0.5, "step": 1.5, "wrap": False, "wind": True},
+    {"id": "med", "lat0": 30.0, "lat1": 46.0, "lon0": -6.0, "lon1": 36.0, "step": 1.0, "wrap": False, "wind": False},
+    {"id": "nord", "lat0": 50.0, "lat1": 66.0, "lon0": -4.0, "lon1": 30.0, "step": 1.0, "wrap": False, "wind": False},
+    {"id": "world", "lat0": -75.0, "lat1": 80.0, "lon0": -180.0, "lon1": 175.0, "step": 5.0, "wrap": True, "wind": True},
 ]
 CHUNK = 200          # points par requête
-PAUSE = 25           # secondes entre deux requêtes (limite gratuite : 600 points / minute)
+PAUSE = 170          # secondes entre deux requêtes : ~4 200 points / heure (limites gratuites : 5 000 / heure, 10 000 / jour)
 COMMON = {"forecast_days": 7, "temporal_resolution": "hourly_3", "timezone": "Europe/Paris"}
 
 
@@ -70,6 +74,8 @@ def main():
     for g in GRIDS:
         n_lat, n_lon, pts = points(g)
         known = mask.get(g["id"])
+        if known is not None and len(known) != len(pts):
+            known = None  # la grille a changé : on redemande tout pour refaire le masque
         sea_idx = [i for i in range(len(pts)) if known is None or known[i]]
         print(f"Grille {g['id']} : {len(pts)} points, {len(sea_idx)} demandés", flush=True)
         sea_pts = [pts[i] for i in sea_idx]
@@ -89,6 +95,8 @@ def main():
         new_mask[g["id"]] = sea
         meta = {"id": g["id"], "lat0": g["lat0"], "lon0": g["lon0"], "step": g["step"], "nLat": n_lat, "nLon": n_lon, "wrap": g["wrap"]}
         swell_out.append(dict(meta, h=h, p=p, d=d))
+        if not g["wind"]:
+            continue
         # Vent : uniquement sur les points en mer
         wind_idx = [i for i in range(n_p) if sea[i]]
         wind = fetch("https://api.open-meteo.com/v1/forecast",
