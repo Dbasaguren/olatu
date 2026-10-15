@@ -181,6 +181,7 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
 .btn.primary:hover{color:var(--surface);filter:brightness(1.08)}
 .sess-bar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.btn.cam{text-decoration:none;color:var(--ink);display:inline-flex;align-items:center}
 /* Sessions */
 .sform{display:grid;gap:12px}
 .frow{display:flex;gap:10px;flex-wrap:wrap}
@@ -300,7 +301,7 @@ td.bicho .bnorm{color:var(--muted)}
     <div>
       <h2 id="spotName">–</h2>
       <div class="meta" id="spotMeta"></div>
-      <div class="sess-bar"><button class="btn primary" id="logBtn" type="button">+ Noter une session</button><button class="btn" id="mySess" type="button">Mes sessions</button></div>
+      <div class="sess-bar"><button class="btn primary" id="logBtn" type="button">+ Noter une session</button><button class="btn" id="mySess" type="button">Mes sessions</button><a class="btn cam" id="camBtn" href="#" target="_blank" rel="noopener" hidden>Webcam ↗</a></div>
     </div>
     <div class="controls">
       <div><span class="seg-lab">Pas</span><div class="seg" id="segStep"><button type="button" data-v="3">3 h</button><button type="button" data-v="1">1 h</button></div></div>
@@ -639,6 +640,23 @@ function windRel(dir, face){
 const REL_TXT = {off:"offshore", cross:"side-shore", on:"onshore"};
 // Direction de houle idéale par spot (provenance, en degrés) et tolérance [bonne, moyenne].
 // Les spots abrités (baie de Saint-Jean-de-Luz, Hendaye) ont une fenêtre plus étroite.
+// Webcams en direct (liens : ces sites interdisent l'affichage dans une autre appli)
+const QS = "https://www.quiksilver.fr/surf-webcams/";
+const CAMS = {
+  cotebasques: {url: QS+"biarritz-cote-des-basques.html", label:"Côte des Basques"},
+  grandeplage: {url: QS+"biarritz-la-grande-plage.html", label:"Grande Plage de Biarritz"},
+  sablesdor:   {url: QS+"anglet.html", label:"Anglet, Le Club et Sables d'Or"},
+  parlementia: {url: QS+"guethary.html", label:"Parlementia, Bidart Centre et Guéthary"},
+  bidartcentre:{url: QS+"guethary.html", label:"Parlementia, Bidart Centre et Guéthary"},
+  saintebarbe: {url: QS+"saint-jean-de-luz.html", label:"Saint-Jean-de-Luz, Sainte-Barbe"},
+  hendaye:     {url: QS+"hendaye.html", label:"Hendaye Plage et Deux Jumeaux"},
+  deuxjumeaux: {url: QS+"hendaye.html", label:"Hendaye Plage et Deux Jumeaux"},
+};
+function renderCam(spot){
+  const b = document.getElementById("camBtn"), c = CAMS[spot.id];
+  b.hidden = !c;
+  if(c){ b.href = c.url; b.title = "Webcam en direct : " + c.label + " (Quiksilver / Viewsurf, nouvel onglet)"; }
+}
 const SWELL = {
   barre:[295], cavaliers:[295], sablesdor:[295], grandeplage:[300], cotebasques:[290],
   ilbarritz:[300], pavillon:[300], erretegia:[300], centmarches:[300], bidartcentre:[300], uhabia:[300],
@@ -948,7 +966,7 @@ function renderSpotPicker(){
   const towns = [...new Set(SPOTS.map(x=>x.town))];
   document.getElementById("spotPick").innerHTML = towns.map(t=>`<div class="sp-town"><h4>${t}</h4>${SPOTS.filter(x=>x.town===t).map(x=>{
     const fav = (state.favs||[]).includes(x.id);
-    return `<div class="sp-row${x.id===state.spot?" cur":""}"><button type="button" class="sp-star" data-fav="${x.id}" aria-pressed="${fav}" aria-label="${fav?"Retirer":"Ajouter"} ${x.name} ${fav?"des":"aux"} favoris">${fav?"★":"☆"}</button><button type="button" class="sp-go" data-go="${x.id}">${x.name}${x.big?' <em>grosse houle</em>':x.reef?' <em>reef</em>':""}</button></div>`;
+    return `<div class="sp-row${x.id===state.spot?" cur":""}"><button type="button" class="sp-star" data-fav="${x.id}" aria-pressed="${fav}" aria-label="${fav?"Retirer":"Ajouter"} ${x.name} ${fav?"des":"aux"} favoris">${fav?"★":"☆"}</button><button type="button" class="sp-go" data-go="${x.id}">${x.name}${x.big?' <em>grosse houle</em>':x.reef?' <em>reef</em>':""}${CAMS[x.id]?' <em>webcam</em>':""}</button></div>`;
   }).join("")}</div>`).join("");
 }
 function syncSeg(id, val){ document.querySelectorAll(`#${id} button`).forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.v==String(val)))); }
@@ -962,6 +980,7 @@ document.getElementById("out").addEventListener("toggle", e=>{ const d=e.target;
 
 let reqId = 0, last = null;
 async function show(force){
+  renderCam(SPOTS.find(s=>s.id===state.spot));
   const spot = SPOTS.find(s=>s.id===state.spot), my = ++reqId;
   document.getElementById("spotName").textContent = `${spot.town} · ${spot.name}`;
   if(!cache[spot.id] || force) document.getElementById("out").innerHTML = `<div class="block"><div class="msg"><b>Chargement des prévisions…</b>Houle, vent et marée pour ${spot.name}.</div></div>`;
