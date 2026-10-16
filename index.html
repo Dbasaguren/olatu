@@ -229,6 +229,30 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .leaflet-popup-content b{font-size:15px}
 @media (max-width:640px){.map-frame,.map-load{margin-inline:-14px;border-radius:0}.map-frame{height:calc(100vh - 290px)}.map-legend{min-width:180px}}
 /* Bichomètre */
+.bicho-open{font-size:18px;text-decoration:none;opacity:.35}
+.bicho-open:hover{opacity:1}
+table.fc tr.g-fun td.bicho, table.fc tr.g-fun th.lab{cursor:pointer}
+dialog.bicho-dlg{border:0;padding:0;width:100%;max-width:100%;height:100%;max-height:100%;margin:0;background:#07131c;color:#e3ecf1}
+dialog.bicho-dlg::backdrop{background:#07131c}
+.bk-head{display:flex;justify-content:space-between;align-items:center;padding:max(14px,env(safe-area-inset-top)) 16px 10px}
+.bk-head h2{margin:0;font:700 20px var(--f-ui);color:#f28cbc}
+.bk-head small{font-weight:500;font-size:12px;color:#8fa3b1;margin-left:6px}
+.bicho-dlg .btn:not(.primary){background:#0f1f2a;color:#e3ecf1;border-color:#2b4150}
+.bk-tabs{margin:0 16px;background:#0f1f2a;border-color:#2b4150}
+.bk-tabs button{color:#8fa3b1;flex:1}
+.bk-tabs button[aria-pressed="true"]{background:#d14d8b;color:#fff}
+.bk-body{padding:18px 16px;display:grid;justify-items:center;text-align:center;gap:10px}
+.bk-start p{color:#8fa3b1}
+.bk-dial{width:min(70vw,280px);aspect-ratio:1;border-radius:50%;border:3px solid #2b4150;display:grid;place-items:center;margin-top:10px;background:radial-gradient(circle,#0f2533,#07131c)}
+.bk-arrow{font-size:min(30vw,120px);line-height:1;color:#f28cbc;transition:transform .12s linear}
+.bk-heat{font:800 30px/1.1 var(--f-ui);margin:6px 0 0;letter-spacing:.02em}
+.bk-hint{color:#8fa3b1;margin:0;font-size:14px}
+#bkCanvas{width:min(86vw,340px);height:auto;aspect-ratio:1}
+.bk-bar{width:min(80vw,320px);height:12px;border-radius:6px;background:#0f2533;overflow:hidden;margin-top:14px}
+#bkBarFill{height:100%;width:0;background:linear-gradient(90deg,#4fc1cc,#f28cbc);transition:width .2s}
+.bk-step{color:#8fa3b1;font-size:13px;min-height:18px;margin:0}
+.bk-foot{color:#4b6474;font-size:11.5px;margin-top:18px}
+.bk-lock{color:#ff5fa2;animation:bb1 .5s ease-in-out infinite}
 td.bicho{height:auto;padding:5px 4px;font:500 12px/1.2 var(--f-ui);white-space:normal}
 td.bicho .bb1{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--g-fun);color:#fff;font-weight:700;animation:bb1 1.6s ease-in-out infinite}
 td.bicho .bnorm{color:var(--muted)}
@@ -342,6 +366,7 @@ td.bicho .bnorm{color:var(--muted)}
     <p><b>Coefficient</b> calculé à partir de la marée astronomique de Brest (marégraphe SHOM, 2000–2026) : marnage / 6,10 m × 100, comme le coefficient officiel. Vérifié sur les grandes marées de 2015 (119), à ±3 environ.</p>
     <p><b>Houle</b> : modèle MFWAM (Météo-France) au large du spot, sans effet de réfraction ni de bathymétrie locale. <b>Vent de synthèse</b> : AROME 1,3 km sur 2 jours, puis ARPEGE, puis ECMWF. <b>Note</b> indicative, calculée depuis l'énergie, la période et le vent par rapport à l'orientation de la plage.</p>
     <p>Données : Open-Meteo.com (Météo-France, DWD, ECMWF, NOAA), licence CC BY 4.0. Marégraphes : REFMAR / Shom, Licence Ouverte 2.0 (doi:10.17183/REFMAR). Ces prédictions ne sont pas vérifiées par le Shom.</p>
+    <p><button type="button" class="linkbtn bicho-open" id="bichoOpen">🦌</button></p>
   </section>
 </div>
 
@@ -389,6 +414,28 @@ td.bicho .bnorm{color:var(--muted)}
     </section>
   </div>
   <div class="pd-foot"><button class="btn danger" type="button" id="delProf">Supprimer ce profil</button><button class="btn" type="button" id="resetProf">Tout réafficher</button></div>
+</dialog>
+
+<dialog class="bicho-dlg" id="bichoDlg" aria-labelledby="bkTitle">
+  <div class="bk-head"><h2 id="bkTitle">Bichomètre <small>mode terrain</small></h2><button class="btn" type="button" data-close>Fermer</button></div>
+  <div class="seg bk-tabs" id="bkTabs"><button type="button" data-v="compass">Boussole</button><button type="button" data-v="radar">Radar</button><button type="button" data-v="scan">Scan</button></div>
+  <div class="bk-body">
+    <div class="bk-start" id="bkStart"><p>Active les capteurs du téléphone (boussole, mouvement, son).</p><button class="btn primary" type="button" id="bkGo">Activer les capteurs</button></div>
+    <div class="bk-pane" id="bkCompass" hidden>
+      <div class="bk-dial"><div class="bk-arrow" id="bkArrow">▲</div></div>
+      <p class="bk-heat" id="bkHeat">…</p>
+      <p class="bk-hint" id="bkHint">Tourne sur toi-même, téléphone à plat.</p>
+    </div>
+    <div class="bk-pane" id="bkRadar" hidden><canvas id="bkCanvas" width="320" height="320"></canvas><p class="bk-hint" id="bkRadarTxt">Balayage en cours…</p></div>
+    <div class="bk-pane" id="bkScan" hidden>
+      <p class="bk-hint">Secoue le téléphone pour scanner la zone.</p>
+      <div class="bk-bar"><div id="bkBarFill"></div></div>
+      <p class="bk-step" id="bkStep">&nbsp;</p>
+      <p class="bk-heat" id="bkVerdict">&nbsp;</p>
+      <button class="btn" type="button" id="bkScanBtn">Scanner sans secouer</button>
+    </div>
+    <p class="bk-foot">100 % fictif : aucune position ni personne réelle, tout est tiré au sort.</p>
+  </div>
 </dialog>
 
 <dialog class="prefs" id="spotsDlg" aria-labelledby="spTitle">
@@ -1623,6 +1670,119 @@ document.getElementById("sessForm").addEventListener("submit", async e=>{
   msg.textContent = `Session enregistrée : ${f.hs.toFixed(1)} m à ${Math.round(f.per)} s, ta note ${sfRating}/10. Les notes du tableau sont mises à jour.`;
   btn.disabled = false; document.getElementById("sfNote").value = ""; sfRating = null; fillSessForm(); renderSessList(); applyAll();
 });
+
+// ---------- Bichomètre, mode terrain (pour rire : tout est tiré au sort, rien de réel) ----------
+const bk = {heading:null, tab:"compass", on:false, raf:0, locked:false, audio:null, sweep:0, lastPing:{}, scanning:false};
+const bkDlg = document.getElementById("bichoDlg");
+// Tirage fixe par jour et par spot : tout le monde sur le même spot cherche au même endroit
+function bkSeed(extra){ const s = dayKey(nowNaive()) + state.spot + (extra||""); let h = 2166136261; for(const ch of s){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; }
+function bkOnOrient(e){
+  const h = e.webkitCompassHeading != null ? e.webkitCompassHeading : (e.absolute || e.type==="deviceorientationabsolute") && e.alpha != null ? (360 - e.alpha) % 360 : null;
+  if(h != null) bk.heading = h;
+}
+let bkShakeT = 0;
+function bkOnMotion(e){
+  const a = e.accelerationIncludingGravity; if(!a || bk.tab!=="scan") return;
+  const g = Math.hypot(a.x||0, a.y||0, a.z||0);
+  if(g > 24 && Date.now() - bkShakeT > 1500){ bkShakeT = Date.now(); bkScan(); }
+}
+async function bkStart(){
+  try{   // iPhone : autorisation explicite, sur un geste de l'utilisateur
+    if(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") await DeviceOrientationEvent.requestPermission();
+    if(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function") await DeviceMotionEvent.requestPermission();
+  }catch(e){}
+  window.addEventListener("deviceorientationabsolute", bkOnOrient);
+  window.addEventListener("deviceorientation", bkOnOrient);
+  window.addEventListener("devicemotion", bkOnMotion);
+  try{ bk.audio = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
+  bk.on = true; document.getElementById("bkStart").hidden = true;
+  bkShowTab(); if(!bk.raf) bk.raf = requestAnimationFrame(bkTick);
+}
+function bkStop(){
+  window.removeEventListener("deviceorientationabsolute", bkOnOrient);
+  window.removeEventListener("deviceorientation", bkOnOrient);
+  window.removeEventListener("devicemotion", bkOnMotion);
+  cancelAnimationFrame(bk.raf); bk.raf = 0; bk.on = false;
+  if(bk.audio){ bk.audio.close().catch(()=>{}); bk.audio = null; }
+}
+function bkPing(freq){
+  if(!bk.audio) return;
+  const o = bk.audio.createOscillator(), g = bk.audio.createGain(), t = bk.audio.currentTime;
+  o.frequency.value = freq; g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+  o.connect(g).connect(bk.audio.destination); o.start(t); o.stop(t + 0.4);
+}
+function bkShowTab(){
+  syncSeg("bkTabs", bk.tab);
+  if(!bk.on) return;
+  for(const [t, id] of [["compass","bkCompass"],["radar","bkRadar"],["scan","bkScan"]]) document.getElementById(id).hidden = bk.tab !== t;
+}
+const BK_TARGET = () => Math.floor(bkSeed("cap") * 360);
+function bkTick(){
+  bk.raf = requestAnimationFrame(bkTick);
+  if(bk.tab==="compass") bkCompass(); else if(bk.tab==="radar") bkRadar();
+}
+function bkCompass(){
+  const heat = document.getElementById("bkHeat"), hint = document.getElementById("bkHint"), arrow = document.getElementById("bkArrow");
+  if(bk.heading == null){ heat.textContent = "Boussole introuvable"; hint.textContent = "Il faut un téléphone avec boussole (pas un PC)."; return; }
+  const diff = ((BK_TARGET() - bk.heading) % 360 + 540) % 360 - 180;   // -180..180, positif = tourner à droite
+  arrow.style.transform = `rotate(${diff}deg)`;
+  const a = Math.abs(diff);
+  const lvl = a < 5 ? ["BB1 VERROUILLÉE", "#ff5fa2"] : a < 15 ? ["BRÛLANT", "#ff7a3d"] : a < 45 ? ["CHAUD", "#f2c14e"] : a < 90 ? ["Tiède", "#9bd94a"] : ["Froid", "#4fc1cc"];
+  heat.textContent = lvl[0]; heat.style.color = lvl[1]; heat.classList.toggle("bk-lock", a < 5);
+  hint.textContent = a < 5 ? "Ne bouge plus." : diff > 0 ? "Encore un peu à droite…" : "Encore un peu à gauche…";
+  if(a < 5 && !bk.locked){ bk.locked = true; if(navigator.vibrate) navigator.vibrate([120, 60, 120]); bkPing(880); }
+  if(a > 10) bk.locked = false;
+}
+function bkRadar(){
+  const cv = document.getElementById("bkCanvas"), ctx = cv.getContext("2d"), W = cv.width, R = W/2 - 8, c = W/2;
+  bk.sweep = (bk.sweep + 1.6) % 360;
+  const rot = bk.heading != null ? -bk.heading : 0;   // le radar tourne avec le téléphone
+  ctx.fillStyle = "rgba(4,16,12,.25)"; ctx.fillRect(0, 0, W, W);   // rémanence
+  ctx.strokeStyle = "rgba(60,220,140,.35)"; ctx.lineWidth = 1;
+  for(const r of [R, R*0.66, R*0.33]){ ctx.beginPath(); ctx.arc(c, c, r, 0, 2*Math.PI); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(c-R, c); ctx.lineTo(c+R, c); ctx.moveTo(c, c-R); ctx.lineTo(c, c+R); ctx.stroke();
+  const sa = (bk.sweep - 90) * DEG;
+  ctx.strokeStyle = "rgba(90,255,170,.9)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(c, c); ctx.lineTo(c + R*Math.cos(sa), c + R*Math.sin(sa)); ctx.stroke();
+  // Échos : positions tirées au sort pour le jour et le spot ; le gros = BB1
+  const n = 3 + Math.floor(bkSeed("n") * 3);
+  let txt = "Balayage en cours…";
+  for(let i=0;i<n;i++){
+    const brg = bkSeed("b"+i) * 360, dist = 0.25 + bkSeed("d"+i) * 0.7, big = i === 0;
+    const scr = ((brg + rot) % 360 + 360) % 360, ang = (scr - 90) * DEG, x = c + R*dist*Math.cos(ang), y = c + R*dist*Math.sin(ang);
+    const since = ((bk.sweep - scr) % 360 + 360) % 360;   // degrés depuis le passage du balayage
+    if(since < 2 && (!bk.lastPing[i] || Date.now() - bk.lastPing[i] > 1000)){ bk.lastPing[i] = Date.now(); bkPing(big ? 1200 : 700); if(big && navigator.vibrate) navigator.vibrate(60); }
+    const alpha = Math.max(0, 1 - since/300);
+    ctx.fillStyle = big ? `rgba(255,95,162,${alpha})` : `rgba(90,255,170,${alpha})`;
+    ctx.beginPath(); ctx.arc(x, y, big ? 7 : 4, 0, 2*Math.PI); ctx.fill();
+    if(big && alpha > 0.2){ ctx.font = "700 13px Barlow, sans-serif"; ctx.fillText("BB1", x + 10, y + 4); txt = `BB1 détectée à ${Math.round(dist * 300)} m, cap ${Math.round(brg)}° (${card(brg)})`; }
+  }
+  document.getElementById("bkRadarTxt").textContent = txt;
+}
+const BK_STEPS = ["Calibration des capteurs à biches…", "Analyse des phéromones de wax…", "Triangulation par satellite (imaginaire)…", "Filtrage des mouettes…", "Croisement avec le coefficient de marée…"];
+const BK_VERDICTS = [["Zone calme. Concentre-toi sur la houle.", "#4fc1cc"], ["Traces fraîches repérées.", "#9bd94a"], ["Activité suspecte au pic.", "#f2c14e"], ["ALERTE BB1 PAS LOIN", "#ff5fa2"], ["Signal brouillé : trop de néoprène.", "#8fa3b1"]];
+function bkScan(){
+  if(bk.scanning) return; bk.scanning = true;
+  const fill = document.getElementById("bkBarFill"), step = document.getElementById("bkStep"), ver = document.getElementById("bkVerdict");
+  ver.textContent = " "; let k = 0;
+  const t = setInterval(()=>{
+    k++; fill.style.width = (k*20) + "%"; step.textContent = BK_STEPS[(k-1) % BK_STEPS.length]; bkPing(400 + k*120);
+    if(k >= 5){
+      clearInterval(t);
+      const v = BK_VERDICTS[Math.floor(Math.random() * BK_VERDICTS.length)];
+      ver.textContent = v[0]; ver.style.color = v[1]; step.textContent = "Scan terminé.";
+      if(navigator.vibrate) navigator.vibrate(v[1]==="#ff5fa2" ? [200,80,200,80,400] : 150);
+      setTimeout(()=>{ fill.style.width = "0"; bk.scanning = false; }, 1500);
+    }
+  }, 550);
+}
+function bkOpen(){ bkShowTab(); bkDlg.showModal(); }
+document.getElementById("bichoOpen").addEventListener("click", bkOpen);
+document.getElementById("out").addEventListener("click", e=>{ if(e.target.closest("tr.g-fun")) bkOpen(); });
+document.getElementById("bkGo").addEventListener("click", bkStart);
+document.getElementById("bkScanBtn").addEventListener("click", bkScan);
+document.getElementById("bkTabs").addEventListener("click", e=>{ const b = e.target.closest("button"); if(!b) return; bk.tab = b.dataset.v; bkShowTab(); });
+bkDlg.addEventListener("click", e=>{ if(e.target.closest("[data-close]")) bkDlg.close(); });
+bkDlg.addEventListener("close", ()=>{ bkStop(); document.getElementById("bkStart").hidden = false; ["bkCompass","bkRadar","bkScan"].forEach(id=>document.getElementById(id).hidden = true); });
 
 // Appli installable : cache hors ligne (uniquement quand le site est servi en http/https)
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
