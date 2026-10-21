@@ -337,6 +337,7 @@ td.bicho .bnorm{color:var(--muted)}
 
   <div class="viewtabs" id="viewTabs" role="tablist" aria-label="Affichage">
     <button type="button" role="tab" data-view="fc">Prévisions</button>
+    <button type="button" role="tab" data-view="hist">10 derniers jours</button>
     <button type="button" role="tab" data-view="map">Carte</button>
   </div>
   <section id="mapView" hidden>
@@ -392,7 +393,7 @@ td.bicho .bnorm{color:var(--muted)}
         <div class="acc-btns"><button class="btn" type="button" id="accLogout">Se déconnecter</button><button class="btn danger" type="button" id="accDelete">Supprimer mon compte</button></div>
       </div>
       <p class="fmsg" id="accMsg" role="status"></p>
-      <p class="pd-hint">Avec un compte, tes réglages et tes sessions te suivent sur tous tes appareils. Personne d'autre ne peut les voir.</p>
+      <p class="pd-hint">Avec un compte, tes réglages et tes sessions te suivent sur tous tes appareils. Personne d'autre ne peut les voir. La date de ta dernière visite est enregistrée.</p>
     </section>
     <section class="pd-sec" id="profSec">
       <h3>Profil sans compte</h3>
@@ -583,13 +584,13 @@ async function fetchSpot(spot, force){
   const c = cache[spot.id];
   if(c && !force && Date.now()-c.at < 15*60e3) return c;
   const common = {latitude:spot.lat, longitude:spot.lon, timezone:TZ};
-  const wind = getJSON("https://api.open-meteo.com/v1/forecast?"+qs({...common, forecast_days:10,
+  const wind = getJSON("https://api.open-meteo.com/v1/forecast?"+qs({...common, forecast_days:10, past_days:10,
     hourly:"wind_speed_10m,wind_gusts_10m,wind_direction_10m,temperature_2m,pressure_msl",
     daily:"sunrise,sunset", models:WIND_MODELS.map(m=>m.id).join(","), wind_speed_unit:"kn"}));
-  const sea = getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, forecast_days:10,
+  const sea = getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, forecast_days:10, past_days:10,
     hourly:"wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_direction,sea_surface_temperature"}));
   // Point au large : la grille GFS-Wave (25 km) n'a pas de mer au ras de la côte
-  const cmp = getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, longitude:(spot.lon-0.2).toFixed(3), forecast_days:10,
+  const cmp = getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, longitude:(spot.lon-0.2).toFixed(3), forecast_days:10, past_days:10,
     hourly:"wave_height,wave_period,wave_direction", models:WAVE_MODELS.map(m=>m.id).join(",")}));
   const [w, s, m] = await Promise.all([wind, sea, cmp]);
   const out = {at:Date.now(), w, s, m};
@@ -678,6 +679,19 @@ function cellStyle(scale, v){
 }
 const color = (scale, v) => { const [r,g,b] = rgbAt(scale, v); return `rgb(${r},${g},${b})`; };
 const bg = (scale,v) => { const c=cellStyle(scale,v); return c?` style="${c}"`:""; };
+// Dégradé : chaque case se fond à mi-chemin avec ses voisines (si elles sont à un pas de temps d'écart)
+const scaleRgb = scale => v => { const c = rgbAt(scale, v); return dark && c[0]+c[1]+c[2] > 750 ? null : c; };
+function hslRgb(h, s, l){ const k = n => (n + h/30) % 12, a = s*Math.min(l, 1-l), f = n => l - a*Math.max(-1, Math.min(k(n)-3, 9-k(n), 1)); return [f(0), f(8), f(4)].map(x=>Math.round(x*255)); }
+const noteRgb = v => hslRgb(v*12, 0.72, 0.76);
+function rowStyles(cols, vals, colorFn){
+  const cs = vals.map(v => v==null || isNaN(v) ? null : colorFn(v));
+  const mix = (a, b) => a.map((x, k) => Math.round((x + b[k]) / 2));
+  return cs.map((c, i) => {
+    if(!c) return "";
+    const nb = j => j>=0 && j<cs.length && cs[j] && Math.abs(cols[j].t - cols[i].t) <= state.step*H ? cs[j] : c;
+    return ` style="background:linear-gradient(90deg,rgb(${mix(nb(i-1), c)}),rgb(${c}) 50%,rgb(${mix(nb(i+1), c)}));color:#122433"`;
+  });
+}
 
 // ---------- Relation vent / plage ----------
 function windRel(dir, face){
@@ -777,13 +791,15 @@ function buildCols(w){
   const sun = {};
   const d = w.daily, srK = Object.keys(d).find(k=>k.startsWith("sunrise")), ssK = Object.keys(d).find(k=>k.startsWith("sunset"));
   d.time.forEach((day,i)=>{ sun[day] = [tp(d[srK][i]), tp(d[ssK][i])]; });
-  const firstDay = tp(w.hourly.time[0]), lastDay = firstDay + state.days*24*H;
+  // Prévisions : d'aujourd'hui à +N jours ; historique : les 10 derniers jours jusqu'à maintenant
+  const today = tp(dayKey(now)), hist = state.view === "hist";
+  const firstDay = hist ? today - 10*24*H : today, lastDay = hist ? now + step*H/2 : today + state.days*24*H;
   const cols = [];
   w.hourly.time.forEach(ts=>{
     const t = tp(ts), h = new Date(t).getUTCHours(), dk = ts.slice(0,10), [sr, ss] = sun[dk] || [t,t];
     if(h % step) return;
-    if(t >= lastDay) return;
-    if(t + step*H/2 < now) return;
+    if(t < firstDay || t >= lastDay) return;
+    if(!hist && t + step*H/2 < now) return;
     const night = t < sr - 1.5*H || t > ss + 0.5*H;
     if(state.night==="hide" && (t < sr - 2*H || t > ss + H)) return;
     cols.push({t, h, dk, night, now: now >= t - step*H/2 && now < t + step*H/2});
@@ -824,7 +840,7 @@ function render(spot, data){
   // Groupes de jours
   const days = []; cols.forEach((c,i)=>{ if(!days.length || days[days.length-1].dk!==c.dk) days.push({dk:c.dk, n:0, first:i}); days[days.length-1].n++; c.ds = days[days.length-1].first===i; });
   // Marée : prédiction harmonique Socoa (pas de 6 min) + surcote barométrique (-1 cm par hPa au-dessus de 1013 hPa)
-  const u0 = tp(w.hourly.time[0]) - 26*H, u1 = u0 + 12*24*H;
+  const u0 = tp(w.hourly.time[0]) - 26*H, u1 = tp(w.hourly.time[w.hourly.time.length-1]) + 26*H;
   const coefs = coefsByDay(u0, u1);
   let surgeOk = false;
   const lvl = tideSeries(TIDE.socoa, u0, u1, 6).map(([t,v])=>{
@@ -847,6 +863,7 @@ function render(spot, data){
   const tblW = labW + cols.length*colW;
   const cls = (c, extra="") => { const k=[extra]; if(c.ds) k.push("ds"); if(c.night) k.push("n"); return k.join(" ").trim(); };
   const td = (c, inner, extra="", attr="") => `<td class="${cls(c,extra)}"${attr}>${inner}</td>`;
+  const cRow = (scale, get, show) => { const vals = cols.map(get), st = rowStyles(cols, vals, scaleRgb(scale)); return cols.map((c, i)=>td(c, show(vals[i]), "", st[i])).join(""); };
   const lab = (t, sub) => `<th class="lab" scope="row">${t}${sub?`<small>${sub}</small>`:""}</th>`;
   const cfStyle = v => { const L = dark ? 30 : 86; const hue = v<45?205: v<70?180: v<95?40: 8; const sat = v<45?20:v<70?35:70; return `background:hsl(${hue} ${sat}% ${L}%)`; };
 
@@ -906,26 +923,27 @@ function render(spot, data){
   const gap = `<tr class="gap"><th class="lab"></th><td colspan="${cols.length}"></td></tr>`;
   // Pas de note tant que tu n'as noté aucune session sur ce spot
   const spotSess = state.sessions.filter(x=>x.spot===spot.id && x.f).length;
-  const noteCell = c => {
+  const noteSt = rowStyles(cols, cols.map(c=>c.score ? c.score.v : null), noteRgb);
+  const noteCell = (c, i) => {
     if(!spotSess) return td(c, "–", "dim", ` title="Note une session sur ce spot pour voir ta note"`);
     if(!c.score) return td(c, "–", "dim");
     const v = c.score.v, perso = c.score.w >= 0.3;
     const tip = `Note ${v.toFixed(1)}/10` + (perso ? ` · ajustée par ${c.score.n} de tes sessions (note de base ${c.score.base.toFixed(1)})` : " · note de base");
-    return td(c, Math.round(v), "note"+(perso?" perso":""), ` style="${scoreBg(v)}" title="${tip}"`);
+    return td(c, Math.round(v), "note"+(perso?" perso":""), `${noteSt[i]} title="${tip}"`);
   };
 
   const R = {
     note:     `${lab("Note", spotSess ? "/10 · • = perso" : "/10 · aucune session")}${cols.map(noteCell).join("")}`,
-    houle:    `${lab("Hauteur","m")}${cols.map(c=>td(c, fmt(c.hs,1), "", bg("wave",c.hs))).join("")}`,
-    periode:  `${lab("Période","s")}${cols.map(c=>td(c, fmt(c.per), "", bg("period",c.per))).join("")}`,
+    houle:    `${lab("Hauteur","m")}${cRow("wave", c=>c.hs, v=>fmt(v,1))}`,
+    periode:  `${lab("Période","s")}${cRow("period", c=>c.per, fmt)}`,
     dirhoule: `${lab("Direction","selon le spot")}${cols.map(c=>{
       if(c.dir==null) return td(c, "–", "dim");
       const fit = swellFit(c.dir, spot);
       return td(c, arrow(c.dir, `Houle de ${card(c.dir)} (${Math.round(c.dir)}°), ${fit.txt} pour ce spot (idéale : ${card(fit.best)}, ${fit.best}°)`), "dirc "+fit.cls);
     }).join("")}`,
-    energie:  `${lab("Énergie","kJ")}${cols.map(c=>td(c, fmt(c.e), "", bg("energy",c.e))).join("")}`,
-    vent:     `${lab("Vent","nœuds")}${cols.map(c=>td(c, fmt(c.ws), "", bg("wind",c.ws))).join("")}`,
-    rafales:  `${lab("Rafales","nœuds")}${cols.map(c=>td(c, fmt(c.wg), "", bg("wind",c.wg))).join("")}`,
+    energie:  `${lab("Énergie","kJ")}${cRow("energy", c=>c.e, fmt)}`,
+    vent:     `${lab("Vent","nœuds")}${cRow("wind", c=>c.ws, fmt)}`,
+    rafales:  `${lab("Rafales","nœuds")}${cRow("wind", c=>c.wg, fmt)}`,
     dirvent:  `${lab("Direction","off / side / on")}${cols.map(c=>td(c, arrow(c.wdir, c.wdir==null?"":`Vent de ${card(c.wdir)} (${Math.round(c.wdir)}°), ${REL_TXT[c.rel]}`), "dirc "+(c.rel||""))).join("")}`,
     courbe:   tideRow(),
     pmbm:     tideTimesRow(),
@@ -946,8 +964,8 @@ function render(spot, data){
   const waveCmp = !state.blocks.wavecmp ? "" : `
   <details class="block" data-id="wavecmp" ${state.open.wavecmp?"open":""}><summary><span class="bt-name">Houle · comparaison des modèles</span><span class="bt-info">au large (~15 km à l'ouest) · hauteur (m) et période moyenne (s)</span></summary>
   <div class="scroll"><table class="fc" style="width:${tblW}px">${colgroup}<thead>${header()}</thead><tbody>
-    ${wv.map(({md,h,p},i)=>`${i?gap:""}<tr>${lab(md.name,md.info+" · m")}${cols.map(c=>{const v=h.get(c.t); return td(c, fmt(v,1), "", bg("wave",v));}).join("")}</tr>
-    <tr>${lab("Période","s")}${cols.map(c=>{const v=p.get(c.t); return td(c, fmt(v), "", bg("period",v));}).join("")}</tr>`).join("")}
+    ${wv.map(({md,h,p},i)=>`${i?gap:""}<tr>${lab(md.name,md.info+" · m")}${cRow("wave", c=>h.get(c.t), v=>fmt(v,1))}</tr>
+    <tr>${lab("Période","s")}${cRow("period", c=>p.get(c.t), fmt)}</tr>`).join("")}
   </tbody></table></div></details>`;
 
   // Un bloc par modèle de vent (format Windguru)
@@ -957,13 +975,14 @@ function render(spot, data){
     return `
   <details class="block" data-id="${md.id}" ${state.open[md.id]?"open":""}><summary><span class="bt-name">${md.name}</span><span class="bt-info">${md.info}</span></summary>
   <div class="scroll"><table class="fc" style="width:${tblW}px">${colgroup}<thead>${header()}</thead><tbody>
-    <tr>${lab("Vent","nœuds")}${cols.map(c=>{const v=X.ws.get(c.t); return td(c, fmt(v), "", bg("wind",v));}).join("")}</tr>
-    <tr>${lab("Rafales","nœuds")}${cols.map(c=>{const v=X.wg.get(c.t); return td(c, fmt(v), "", bg("wind",v));}).join("")}</tr>
+    <tr>${lab("Vent","nœuds")}${cRow("wind", c=>X.ws.get(c.t), fmt)}</tr>
+    <tr>${lab("Rafales","nœuds")}${cRow("wind", c=>X.wg.get(c.t), fmt)}</tr>
     <tr>${lab("Direction")}${cols.map(c=>{const v=X.wd.get(c.t); const r=v==null?"":windRel(v,spot.face); return td(c, arrow(v, v==null?"":`Vent de ${card(v)} (${Math.round(v)}°), ${REL_TXT[r]}`), "dirc "+r);}).join("")}</tr>
   </tbody></table></div></details>`;
   }).join("");
 
   document.getElementById("out").innerHTML = synth + waveCmp + windBlocks;
+  if(state.view === "hist") document.querySelectorAll("#out .scroll").forEach(e=>{ e.scrollLeft = e.scrollWidth; });   // historique : on arrive sur les jours récents
 
   // En-tête du spot
   const offDir = (spot.face+180)%360;
@@ -1436,7 +1455,7 @@ function renderView(){
   ["out","legend"].forEach(id=>document.getElementById(id).hidden = map);
   document.querySelector(".notes").hidden = map;
   document.querySelector(".controls").hidden = map;
-  if(!map){ if(MAP.timer) stopMapAnim(); flowStop(); return; }
+  if(!map){ if(MAP.timer) stopMapAnim(); flowStop(); if(last) render(last.spot, last.data); return; }
   syncSeg("segLayer", state.mapLayer);
   refreshMap();
 }
@@ -1475,6 +1494,8 @@ async function useAccount(user){
     if(p.data && p.data.prefs) Object.assign(state, defaultPrefs(), p.data.prefs);
     state.sessions = r.data.map(rowToSess);
     account.ready = true;
+    // Dernière visite : colonne last_seen (supabase/schema.sql), visible uniquement dans le tableau de bord Supabase
+    sb.from("profiles").upsert({id:user.id, last_seen:new Date().toISOString()}).then(({error})=>{ if(error) console.warn("Dernière visite non enregistrée :", error.message); });
     if(!p.data) syncPrefsSoon();   // crée la fiche du compte avec les réglages actuels
     save("profiles", store); applyAll(); renderAccount();
   }catch(err){

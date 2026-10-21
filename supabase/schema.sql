@@ -54,3 +54,6 @@ end;
 $$;
 revoke execute on function public.delete_my_account() from public, anon;
 grant execute on function public.delete_my_account() to authenticated;
+
+-- Ajout 2026-10 : date de dernière visite de chaque compte (lue uniquement dans le tableau de bord)
+alter table public.profiles add column if not exists last_seen timestamptz;
