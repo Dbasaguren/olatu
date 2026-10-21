@@ -228,6 +228,19 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .leaflet-popup-content{font:500 13px/1.45 var(--f-ui);margin:9px 12px}
 .leaflet-popup-content b{font-size:15px}
 @media (max-width:640px){.map-frame,.map-load{margin-inline:-14px;border-radius:0}.map-frame{height:calc(100vh - 290px)}.map-legend{min-width:180px}}
+/* Onglet météo */
+#meteoView{margin-top:14px}
+.wx-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+@media (max-width:1000px){.wx-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
+.wx{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:3px}
+.wx.today{border-color:var(--accent)}
+.wx-day{font:700 14px var(--f-ui)}
+.wx-ico{font-size:34px;line-height:1.1}
+.wx-lab{font-size:12.5px;color:var(--muted);min-height:2.4em}
+.wx-t{font:700 20px var(--f-data);font-variant-numeric:tabular-nums}
+.wx-t small{font-weight:500;color:var(--muted);font-size:15px}
+.wx-l{font:500 12.5px var(--f-data);color:var(--muted);font-variant-numeric:tabular-nums}
+.wx-l b{color:var(--ink);font-weight:600}
 /* Bichomètre */
 .bicho-open{font-size:18px;text-decoration:none;opacity:.35}
 .bicho-open:hover{opacity:1}
@@ -338,8 +351,10 @@ td.bicho .bnorm{color:var(--muted)}
   <div class="viewtabs" id="viewTabs" role="tablist" aria-label="Affichage">
     <button type="button" role="tab" data-view="fc">Prévisions</button>
     <button type="button" role="tab" data-view="hist">10 derniers jours</button>
+    <button type="button" role="tab" data-view="meteo">Météo</button>
     <button type="button" role="tab" data-view="map">Carte</button>
   </div>
+  <section id="meteoView" hidden><div class="wx-grid" id="wxGrid"></div><p class="pd-hint">Météo Open-Meteo (meilleur modèle disponible pour le spot). Températures en °C, vent en nœuds.</p></section>
   <section id="mapView" hidden>
     <div class="map-bar">
       <div class="seg" id="segLayer"><button type="button" data-v="swell">Houle</button><button type="button" data-v="period">Période</button><button type="button" data-v="wind">Vent</button></div>
@@ -1447,15 +1462,50 @@ document.getElementById("mapPlay").addEventListener("click", ()=>{
 document.getElementById("mapSlider").addEventListener("input", e=>{ stopMapAnim(); setMapTime(+e.target.value); });
 document.getElementById("segZoom").addEventListener("click", e=>{ const b = e.target.closest("[data-z]"); if(!b || !MAP.map) return; const [c, z] = VIEWS[b.dataset.z]; MAP.map.flyTo(c, z, {duration:0.8}); });
 
+// ---------- Onglet météo : 7 jours, une carte par jour ----------
+const WX = {0:["☀️","Ciel dégagé"],1:["🌤️","Plutôt dégagé"],2:["⛅","Partiellement nuageux"],3:["☁️","Couvert"],45:["🌫️","Brouillard"],48:["🌫️","Brouillard givrant"],
+  51:["🌦️","Bruine légère"],53:["🌦️","Bruine"],55:["🌦️","Bruine forte"],56:["🌧️","Bruine verglaçante"],57:["🌧️","Bruine verglaçante"],61:["🌧️","Pluie faible"],63:["🌧️","Pluie"],65:["🌧️","Pluie forte"],
+  66:["🌧️","Pluie verglaçante"],67:["🌧️","Pluie verglaçante"],71:["🌨️","Neige faible"],73:["🌨️","Neige"],75:["❄️","Neige forte"],77:["🌨️","Grains de neige"],
+  80:["🌦️","Averses"],81:["🌦️","Averses"],82:["⛈️","Fortes averses"],85:["🌨️","Averses de neige"],86:["🌨️","Averses de neige"],95:["⛈️","Orage"],96:["⛈️","Orage et grêle"],99:["⛈️","Orage et grêle"]};
+const wxCache = {};
+async function renderMeteo(){
+  const spot = SPOTS.find(x=>x.id===state.spot), box = document.getElementById("wxGrid");
+  let d = wxCache[spot.id];
+  if(!d || Date.now()-d.at > 30*60e3){
+    box.innerHTML = `<p class="pd-hint">Chargement de la météo…</p>`;
+    try{
+      const j = await getJSON("https://api.open-meteo.com/v1/forecast?"+qs({latitude:spot.lat, longitude:spot.lon, timezone:TZ, forecast_days:7, wind_speed_unit:"kn",
+        daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max"}));
+      d = wxCache[spot.id] = {at:Date.now(), j};
+    }catch(err){ box.innerHTML = `<p class="pd-hint">Météo indisponible : vérifie ta connexion.</p>`; return; }
+  }
+  if(state.view !== "meteo" || state.spot !== spot.id) return;
+  const D = d.j.daily, todayKey = dayKey(nowNaive());
+  const sst = last && last.spot.id===spot.id ? series(last.data.s, "sea_surface_temperature") : null;
+  box.innerHTML = D.time.map((day, i)=>{
+    const [ico, labw] = WX[D.weather_code[i]] || ["·", "—"], dt = new Date(tp(day));
+    const eau = sst ? [...sst.entries()].filter(([t])=>dayKey(t)===day).map(([,v])=>v) : [];
+    const r = v => v==null ? "–" : Math.round(v);
+    return `<div class="wx${day===todayKey?" today":""}"><div class="wx-day">${day===todayKey?"Aujourd'hui":`${DAYS[dt.getUTCDay()]} ${dt.getUTCDate()}`}</div>
+      <div class="wx-ico" aria-hidden="true">${ico}</div><div class="wx-lab">${labw}</div>
+      <div class="wx-t">${r(D.temperature_2m_max[i])}° <small>/ ${r(D.temperature_2m_min[i])}°</small></div>
+      <div class="wx-l">Pluie <b>${D.precipitation_sum[i]==null?"–":D.precipitation_sum[i].toFixed(1)} mm</b> · ${r(D.precipitation_probability_max[i])} %</div>
+      <div class="wx-l">Vent <b>${r(D.wind_speed_10m_max[i])}</b> · rafales <b>${r(D.wind_gusts_10m_max[i])}</b> nds</div>
+      <div class="wx-l">UV <b>${r(D.uv_index_max[i])}</b>${eau.length?` · eau <b>${Math.round(eau.reduce((a,b)=>a+b,0)/eau.length)}°</b>`:""}</div></div>`;
+  }).join("");
+}
 function renderView(){
   if(state.mapLayer!=="swell" && state.mapLayer!=="period" && state.mapLayer!=="wind") state.mapLayer = "swell";
-  const map = state.view === "map";
+  const map = state.view === "map", meteo = state.view === "meteo", table = !map && !meteo;
   document.querySelectorAll("#viewTabs button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.view === state.view)));
   document.getElementById("mapView").hidden = !map;
-  ["out","legend"].forEach(id=>document.getElementById(id).hidden = map);
-  document.querySelector(".notes").hidden = map;
-  document.querySelector(".controls").hidden = map;
-  if(!map){ if(MAP.timer) stopMapAnim(); flowStop(); if(last) render(last.spot, last.data); return; }
+  document.getElementById("meteoView").hidden = !meteo;
+  ["out","legend"].forEach(id=>document.getElementById(id).hidden = !table);
+  document.querySelector(".notes").hidden = !table;
+  document.querySelector(".controls").hidden = !table;
+  if(!map){ if(MAP.timer) stopMapAnim(); flowStop(); }
+  if(meteo) return renderMeteo();
+  if(table){ if(last) render(last.spot, last.data); return; }
   syncSeg("segLayer", state.mapLayer);
   refreshMap();
 }
