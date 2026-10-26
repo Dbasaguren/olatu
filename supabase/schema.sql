@@ -57,3 +57,28 @@ grant execute on function public.delete_my_account() to authenticated;
 
 -- Ajout 2026-10 : date de dernière visite de chaque compte (lue uniquement dans le tableau de bord)
 alter table public.profiles add column if not exists last_seen timestamptz;
+
+-- Ajout 2026-10 : réglages globaux de l'appli, modifiables uniquement par l'administrateur
+create table if not exists public.admins (
+  user_id uuid primary key references auth.users(id) on delete cascade
+);
+alter table public.admins enable row level security;
+drop policy if exists "Un admin voit sa ligne" on public.admins;
+create policy "Un admin voit sa ligne" on public.admins for select to authenticated using (user_id = (select auth.uid()));
+revoke all on public.admins from anon;
+grant select on public.admins to authenticated;
+
+create table if not exists public.app_config (
+  key text primary key,
+  value jsonb not null
+);
+alter table public.app_config enable row level security;
+drop policy if exists "Tout le monde lit la config" on public.app_config;
+create policy "Tout le monde lit la config" on public.app_config for select to anon, authenticated using (true);
+drop policy if exists "Seul l'admin modifie la config" on public.app_config;
+create policy "Seul l'admin modifie la config" on public.app_config for all to authenticated
+  using (exists (select 1 from public.admins a where a.user_id = (select auth.uid())))
+  with check (exists (select 1 from public.admins a where a.user_id = (select auth.uid())));
+grant select on public.app_config to anon, authenticated;
+grant insert, update on public.app_config to authenticated;
+insert into public.app_config (key, value) values ('bicho_enabled', 'true') on conflict (key) do nothing;

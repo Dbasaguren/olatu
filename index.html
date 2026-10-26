@@ -410,6 +410,12 @@ td.bicho .bnorm{color:var(--muted)}
       <p class="fmsg" id="accMsg" role="status"></p>
       <p class="pd-hint">Avec un compte, tes réglages et tes sessions te suivent sur tous tes appareils. Personne d'autre ne peut les voir. La date de ta dernière visite est enregistrée.</p>
     </section>
+    <section class="pd-sec" id="adminSec" hidden>
+      <h3>Administration</h3>
+      <label class="chk"><input type="checkbox" id="admBicho"> Bichomètre activé pour tout le monde</label>
+      <p class="fmsg" id="admMsg" role="status"></p>
+      <p class="pd-hint">Visible uniquement par toi. S'applique à tous les utilisateurs à leur prochaine ouverture d'Olatu.</p>
+    </section>
     <section class="pd-sec" id="profSec">
       <h3>Profil sans compte</h3>
       <div class="profiles" id="profList"></div>
@@ -564,6 +570,8 @@ useProfile(store.current);
 // Compte Supabase (clé publique : la sécurité est assurée par les règles d'accès de la base)
 const SB_URL = "https://ednyjpdqbxfzbicbmieq.supabase.co", SB_KEY = "sb_publishable_2dGM071JZVxkA6rPuCHD_A_KNtLgJMy";
 const sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+// Réglages de l'appli pour tout le monde (table app_config) ; copie locale pour l'affichage immédiat
+const APP = {bicho:true, ...load("appcfg", {})};
 let account = null;   // {id, email, ready}
 // Compte déjà connecté sur cet appareil : on affiche tout de suite ses données en cache (utile hors ligne)
 if(store.account && store.account.state){
@@ -964,7 +972,7 @@ function render(spot, data){
     pmbm:     tideTimesRow(),
     bicho:    bichoRow(),
   };
-  const body = GROUPS.map(g=>{
+  const body = GROUPS.filter(g=>g.id!=="fun" || APP.bicho).map(g=>{
     const rows = g.rows.filter(([id])=>shown(id));
     if(!rows.length) return "";
     return `<tr class="grp g-${g.id}"><th class="lab" scope="rowgroup">${g.name}</th><td colspan="${cols.length}"></td></tr>` +
@@ -1108,7 +1116,7 @@ function renderWho(){
 }
 function renderPrefs(){
   document.getElementById("profList").innerHTML = Object.keys(store.users).map(n=>`<button type="button" data-p="${esc(n)}" aria-pressed="${n===store.current}">${esc(n)}</button>`).join("");
-  document.getElementById("rowChecks").innerHTML = GROUPS.map(g=>`<div class="rg g-${g.id}"><b>${g.name}</b>${g.rows.map(([id,name])=>`<label class="chk"><input type="checkbox" id="row-${id}" data-row="${id}" ${shown(id)?"checked":""}>${name}</label>`).join("")}</div>`).join("");
+  document.getElementById("rowChecks").innerHTML = GROUPS.filter(g=>g.id!=="fun" || APP.bicho).map(g=>`<div class="rg g-${g.id}"><b>${g.name}</b>${g.rows.map(([id,name])=>`<label class="chk"><input type="checkbox" id="row-${id}" data-row="${id}" ${shown(id)?"checked":""}>${name}</label>`).join("")}</div>`).join("");
   document.getElementById("blockChecks").innerHTML = `<div class="rg g-blocs"><b>Sous le tableau</b>${BLOCKS.map(([id,name])=>`<label class="chk"><input type="checkbox" id="blk-${id}" data-blk="${id}" ${state.blocks[id]?"checked":""}>${name}</label>`).join("")}</div>`;
   document.getElementById("delProf").disabled = Object.keys(store.users).length < 2;
   document.getElementById("profSec").hidden = !!account;
@@ -1544,6 +1552,8 @@ async function useAccount(user){
     if(p.data && p.data.prefs) Object.assign(state, defaultPrefs(), p.data.prefs);
     state.sessions = r.data.map(rowToSess);
     account.ready = true;
+    // Admin ? (table admins : seul l'admin peut lire sa propre ligne)
+    sb.from("admins").select("user_id").eq("user_id", user.id).maybeSingle().then(({data})=>{ if(account && account.id===user.id){ account.admin = !!data; renderAccount(); } });
     // Dernière visite : colonne last_seen (supabase/schema.sql), visible uniquement dans le tableau de bord Supabase
     sb.from("profiles").upsert({id:user.id, last_seen:new Date().toISOString()}).then(({error})=>{ if(error) console.warn("Dernière visite non enregistrée :", error.message); });
     if(!p.data) syncPrefsSoon();   // crée la fiche du compte avec les réglages actuels
@@ -1556,7 +1566,28 @@ function leaveAccount(){
   account = null; store.account = null;
   useProfile(store.current); save("profiles", store); applyAll(); renderAccount();
 }
+async function loadAppConfig(){
+  if(!sb) return;
+  const {data, error} = await sb.from("app_config").select("key,value");
+  if(error || !data) return;
+  for(const r of data) if(r.key === "bicho_enabled") APP.bicho = r.value !== false;
+  save("appcfg", APP); applyAppConfig();
+}
+function applyAppConfig(){
+  document.getElementById("bichoOpen").hidden = !APP.bicho;
+  if(!APP.bicho && bkDlg.open) bkDlg.close();
+  if(last && (state.view==="fc" || state.view==="hist")) render(last.spot, last.data);
+}
+document.getElementById("admBicho").addEventListener("change", async e=>{
+  const on = e.target.checked, msg = document.getElementById("admMsg");
+  const {error} = await sb.from("app_config").upsert({key:"bicho_enabled", value:on});
+  if(error){ e.target.checked = !on; msg.className = "fmsg err"; msg.textContent = "Réglage non enregistré : " + error.message; return; }
+  APP.bicho = on; save("appcfg", APP); applyAppConfig(); renderPrefs();
+  msg.className = "fmsg"; msg.textContent = on ? "Bichomètre activé pour tout le monde." : "Bichomètre désactivé pour tout le monde.";
+});
 function renderAccount(){
+  document.getElementById("adminSec").hidden = !(account && account.admin);
+  document.getElementById("admBicho").checked = APP.bicho;
   const logged = !!account;
   document.getElementById("accForm").hidden = logged || !document.getElementById("accNewPass").hidden;
   document.getElementById("accIn").hidden = !logged;
@@ -1622,6 +1653,7 @@ document.getElementById("accDelete").addEventListener("click", async e=>{
   if(error) return accMsg("Suppression impossible : " + frErr(error), true);
   await sb.auth.signOut(); leaveAccount(); accMsg("Compte supprimé.");
 });
+loadAppConfig();
 if(sb){
   sb.auth.onAuthStateChange((event, session)=>{
     // Hors du callback : la bibliothèque déconseille d'appeler Supabase directement dedans
@@ -1848,7 +1880,8 @@ function bkScan(){
 }
 function bkOpen(){ bkShowTab(); bkDlg.showModal(); }
 document.getElementById("bichoOpen").addEventListener("click", bkOpen);
-document.getElementById("out").addEventListener("click", e=>{ if(e.target.closest("tr.g-fun")) bkOpen(); });
+document.getElementById("bichoOpen").hidden = !APP.bicho;
+document.getElementById("out").addEventListener("click", e=>{ if(APP.bicho && e.target.closest("tr.g-fun")) bkOpen(); });
 document.getElementById("bkGo").addEventListener("click", bkStart);
 document.getElementById("bkScanBtn").addEventListener("click", bkScan);
 document.getElementById("bkTabs").addEventListener("click", e=>{ const b = e.target.closest("button"); if(!b) return; bk.tab = b.dataset.v; bkShowTab(); });
