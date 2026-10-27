@@ -241,14 +241,6 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .wx-t small{font-weight:500;color:var(--muted);font-size:15px}
 .wx-l{font:500 12.5px var(--f-data);color:var(--muted);font-variant-numeric:tabular-nums}
 .wx-l b{color:var(--ink);font-weight:600}
-/* Résumé du jour */
-.sum-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:14px}
-.sum-card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:4px}
-.sum-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
-.sum-day{font:700 16px var(--f-ui)}
-.sum-verdict{font:700 13px var(--f-ui);padding:4px 10px;border-radius:14px}
-.sum-line{font-size:14px;color:var(--muted)}
-.sum-line b{color:var(--ink);font-weight:600;margin-right:4px}
 .disp-btn{align-self:flex-end}
 /* Bichomètre */
 .bicho-open{font-size:18px;text-decoration:none;opacity:.35}
@@ -990,28 +982,6 @@ function render(spot, data){
     return `<tr class="grp g-${g.id}"><th class="lab" scope="rowgroup">${g.name}</th><td colspan="${cols.length}"></td></tr>` +
       rows.map(([id])=>`<tr class="g-${g.id}">${R[id]}</tr>`).join("");
   }).join("");
-  // Résumé du jour : meilleur créneau, houle, vent, marée, en un coup d'œil
-  const sumDay = dk => {
-    const dc = cols.filter(c=>c.dk===dk && !c.night && c.f);
-    if(!dc.length) return "";
-    const sc = dc.map(c=>({c, v: c.score ? c.score.v : baseScore(c.f, spot)}));
-    const top = sc.reduce((a,b)=>b.v>a.v?b:a), bc = top.c;
-    let i0 = sc.indexOf(top), i1 = i0;
-    while(i0>0 && sc[i0-1].v >= top.v-1) i0--;
-    while(i1<sc.length-1 && sc[i1+1].v >= top.v-1) i1++;
-    const hsMax = Math.max(...dc.map(c=>c.hs)), onshore = bc.rel==="on" && bc.ws>=12;
-    const verdict = top.v>=7 ? "Ça envoie" : top.v>=5 ? "Ça surfe" : top.v>=3 ? "Petit mais surfable" : hsMax<0.5 ? "Flat" : onshore ? "Trop venté" : hsMax>3.5 && !spot.big ? "Trop gros" : "Pas terrible";
-    const win = sc[i0].c.h===sc[i1].c.h ? `vers ${sc[i0].c.h}h` : `${sc[i0].c.h}h – ${sc[i1].c.h + (state.step===3 ? 2 : 0)}h`;
-    const tides = ex.filter(e=>dayKey(e.t)===dk).map(e=>`${e.type} ${hhmm(e.t)}`).join(" · ");
-    const dt = new Date(tp(dk)), name = dk===todayKey ? "Aujourd'hui" : `${DAYS[dt.getUTCDay()]} ${dt.getUTCDate()}`;
-    return `<div class="sum-card"><div class="sum-top"><span class="sum-day">${name}</span><span class="sum-verdict" style="${scoreBg(top.v)}">${verdict}</span></div>
-      <div class="sum-line"><b>Meilleur créneau</b> ${win}</div>
-      <div class="sum-line"><b>Houle</b> ${bc.hs.toFixed(1)} m · ${Math.round(bc.per)} s${bc.dir!=null?` · ${card(bc.dir)}`:""} · ${Math.round(bc.e)} kJ</div>
-      <div class="sum-line"><b>Vent</b> ${bc.ws!=null?`${Math.round(bc.ws)} nds ${REL_TXT[bc.rel]}`:"–"}</div>
-      <div class="sum-line"><b>Marée</b> ${tides || "–"}${(coefs[dk]||[]).length?` · coef ${coefs[dk].join("/")}`:""}</div></div>`;
-  };
-  const tomorrow = dayKey(tp(todayKey) + 24*H);
-  const summary = state.view==="fc" ? `<div class="sum-row">${sumDay(todayKey)}${sumDay(tomorrow)}</div>` : "";
   const synth = `
   <div class="block synth"><div class="bt"><span class="bt-name">Synthèse surf</span></div>
   <div class="scroll"><table class="fc" style="width:${tblW}px">${colgroup}<thead>${header()}</thead><tbody>${body || `<tr><td colspan="${cols.length+1}" class="msg">Toutes les lignes sont masquées. Ouvre « Personnaliser » pour en réafficher.</td></tr>`}</tbody></table></div></div>`;
@@ -1038,7 +1008,7 @@ function render(spot, data){
   </tbody></table></div></details>`;
   }).join("");
 
-  document.getElementById("out").innerHTML = summary + synth + waveCmp + windBlocks;
+  document.getElementById("out").innerHTML = synth + waveCmp + windBlocks;
   if(state.view === "hist") document.querySelectorAll("#out .scroll").forEach(e=>{ e.scrollLeft = e.scrollWidth; });   // historique : on arrive sur les jours récents
 
   // En-tête du spot
