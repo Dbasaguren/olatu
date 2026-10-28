@@ -383,7 +383,7 @@ td.bicho .bnorm{color:var(--muted)}
     <p><b>Énergie (kJ)</b> = 0,49 × H² × T², énergie d'une vague par mètre de crête (H = hauteur significative en m, T = période de pic de la houle en s). 1 m à 10 s ≈ 49 kJ, 2 m à 14 s ≈ 384 kJ. À hauteur égale, une houle longue porte beaucoup plus d'énergie.</p>
     <p><b>Marée</b> calculée par analyse harmonique des mesures du marégraphe de Socoa (SHOM, 1990–2026, 54 ondes, cycle lunaire de 18,6 ans inclus). Testée sur 2025–2026, des années non utilisées pour le calcul : heure des PM/BM à 2 min près en médiane, hauteur à 7 cm. Hauteurs en mètres au-dessus du zéro hydrographique, comme dans l'annuaire. S'y ajoute la <b>surcote météo</b> : la mer monte d'environ 1 cm par hPa sous 1013 hPa et baisse au-dessus. Sur les jours de forte dépression, cette correction divise l'erreur par deux.</p>
     <p><b>Coefficient</b> calculé à partir de la marée astronomique de Brest (marégraphe SHOM, 2000–2026) : marnage / 6,10 m × 100, comme le coefficient officiel. Vérifié sur les grandes marées de 2015 (119), à ±3 environ.</p>
-    <p><b>Houle</b> : modèle MFWAM (Météo-France) au large du spot, sans effet de réfraction ni de bathymétrie locale. <b>Vent de synthèse</b> : AROME 1,3 km sur 2 jours, puis ARPEGE, puis ECMWF. <b>Note</b> indicative, calculée depuis l'énergie, la période et le vent par rapport à l'orientation de la plage.</p>
+    <p><b>Houle</b> : modèle GFS-Wave 0,16° (NOAA), le même que Windguru, au large du spot (Météo-France en secours), sans effet de réfraction ni de bathymétrie locale. <b>Vent de synthèse</b> : AROME 1,3 km sur 2 jours, puis ARPEGE, puis ECMWF. <b>Note</b> indicative, calculée depuis l'énergie, la période et le vent par rapport à l'orientation de la plage.</p>
     <p>Données : Open-Meteo.com (Météo-France, DWD, ECMWF, NOAA), licence CC BY 4.0. Marégraphes : REFMAR / Shom, Licence Ouverte 2.0 (doi:10.17183/REFMAR). Ces prédictions ne sont pas vérifiées par le Shom.</p>
     <p><button type="button" class="linkbtn bicho-open" id="bichoOpen">🦌</button></p>
   </section>
@@ -539,7 +539,7 @@ const WIND_MODELS = [
 const WAVE_MODELS = [
   {id:"meteofrance_wave", name:"MFWAM",     info:"Météo-France"},
   {id:"ecmwf_wam025",     name:"ECMWF WAM", info:"ECMWF"},
-  {id:"ncep_gfswave025",  name:"GFS-Wave",  info:"NOAA"},
+  {id:"ncep_gfswave016",  name:"GFS-Wave",  info:"NOAA · comme Windguru"},
 ];
 const TZ = "Europe/Paris";
 const PHONE = matchMedia("(max-width:640px)");
@@ -618,8 +618,11 @@ async function fetchSpot(spot, force){
   // Point au large : la grille GFS-Wave (25 km) n'a pas de mer au ras de la côte
   const cmp = getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, longitude:(spot.lon-0.2).toFixed(3), forecast_days:10, past_days:10,
     hourly:"wave_height,wave_period,wave_peak_period,wave_direction", models:WAVE_MODELS.map(m=>m.id).join(",")}));
-  const [w, s, m] = await Promise.all([wind, sea, cmp]);
-  const out = {at:Date.now(), w, s, m};
+  // Houle du tableau : GFS-Wave 0,16° (NOAA), le modèle affiché par Windguru ; Météo-France en secours
+  const gfs = getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, forecast_days:10, past_days:10,
+    hourly:"wave_height,wave_period,wave_direction", models:"ncep_gfswave016"}));
+  const [w, s, m, g] = await Promise.all([wind, sea, cmp, gfs]);
+  const out = {at:Date.now(), w, s, m, g};
   cache[spot.id] = out;
   return out;
 }
@@ -836,7 +839,8 @@ function buildCols(w){
 
 function render(spot, data){
   dark = matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme!=="light" || document.documentElement.dataset.theme==="dark";
-  const {w, s, m} = data;
+  const {w, s, m, g} = data;
+  const gH = g ? series(g, "wave_height") : new Map(), gP = g ? series(g, "wave_period") : new Map(), gD = g ? series(g, "wave_direction") : new Map();
   const cols = buildCols(w);
   if(!cols.length){ document.getElementById("out").innerHTML = `<div class="block"><div class="msg"><b>Aucun créneau à afficher.</b>Affiche la nuit ou augmente le nombre de jours.</div></div>`; return; }
   const step = state.step, phone = PHONE.matches, colW = step===3 ? (phone ? 42 : 46) : (phone ? 32 : 34), labW = phone ? 84 : 128;
@@ -856,9 +860,9 @@ function render(spot, data){
 
   // Valeurs dérivées par colonne
   cols.forEach(c=>{
-    const H_ = hs.get(c.t), swH = sh.get(c.t);
-    c.hs = H_; c.per = tpk.get(c.t) ?? tpe.get(c.t) ?? ((swH!=null && H_ && swH >= 0.5*H_ ? sp.get(c.t) : null) ?? tm.get(c.t) ?? sp.get(c.t));
-    c.dir = sd.get(c.t) ?? wd.get(c.t);
+    const H_ = gH.get(c.t) ?? hs.get(c.t), swH = sh.get(c.t);
+    c.hs = H_; c.per = gP.get(c.t) ?? tpk.get(c.t) ?? tpe.get(c.t) ?? ((swH!=null && H_ && swH >= 0.5*H_ ? sp.get(c.t) : null) ?? tm.get(c.t) ?? sp.get(c.t));
+    c.dir = gD.get(c.t) ?? sd.get(c.t) ?? wd.get(c.t);
     c.e = H_!=null && c.per!=null ? 0.49*H_*H_*c.per*c.per : null;
     c.ws = best("ws",c.t); c.wg = best("wg",c.t); c.wdir = best("wd",c.t);
     c.rel = c.wdir!=null ? windRel(c.wdir, spot.face) : null;
@@ -1688,18 +1692,20 @@ const mean = arr => { const v = arr.filter(x=>x!=null); return v.length ? v.redu
 // Conditions réelles pendant la session : houle et vent (Open-Meteo, données passées) + marée calculée
 async function fetchConditions(spot, date, h0, h1){
   const common = {latitude:spot.lat, longitude:spot.lon, timezone:TZ, start_date:date, end_date:date};
-  const [mar, met] = await Promise.all([
+  const [mar, met, gfs] = await Promise.all([
     getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, hourly:"wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_peak_period,swell_wave_direction"})),
     getJSON("https://api.open-meteo.com/v1/forecast?"+qs({...common, hourly:"wind_speed_10m,wind_direction_10m,pressure_msl", wind_speed_unit:"kn"})),
+    getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, hourly:"wave_height,wave_period,wave_direction", models:"ncep_gfswave016"})).catch(()=>null),
   ]);
   const hours = []; for(let h=h0; h<=Math.max(h0,h1); h++) hours.push(tp(date+"T"+String(h).padStart(2,"0")+":00"));
   const M = k => series(mar,k), W = k => series(met,k);
   const hs = M("wave_height"), tm = M("wave_period"), wd = M("wave_direction"), sh = M("swell_wave_height"), sp = M("swell_wave_period"), sd = M("swell_wave_direction");
   const ws = W("wind_speed_10m"), wdir = W("wind_direction_10m"), pr = W("pressure_msl");
-  const H_ = mean(hours.map(t=>hs.get(t))), swH = mean(hours.map(t=>sh.get(t)));
+  const G = k => gfs ? series(gfs, k) : new Map(), gH = G("wave_height"), gP = G("wave_period"), gD = G("wave_direction");
+  const H_ = mean(hours.map(t=>gH.get(t))) ?? mean(hours.map(t=>hs.get(t))), swH = mean(hours.map(t=>sh.get(t)));
   const tpk = M("swell_wave_peak_period");
-  const per = mean(hours.map(t=>tpk.get(t))) ?? (swH!=null && H_ && swH >= 0.5*H_ ? mean(hours.map(t=>sp.get(t))) : null) ?? mean(hours.map(t=>tm.get(t)));
-  const dir = circMean(hours.map(t=>sd.get(t) ?? wd.get(t)));
+  const per = mean(hours.map(t=>gP.get(t))) ?? mean(hours.map(t=>tpk.get(t))) ?? (swH!=null && H_ && swH >= 0.5*H_ ? mean(hours.map(t=>sp.get(t))) : null) ?? mean(hours.map(t=>tm.get(t)));
+  const dir = circMean(hours.map(t=>gD.get(t))) ?? circMean(hours.map(t=>sd.get(t) ?? wd.get(t)));
   // vent : moyenne des composantes on/off et side, puis vitesse moyenne
   const comps = hours.map(t=>ws.get(t)!=null && wdir.get(t)!=null ? windComp(ws.get(t), wdir.get(t), spot.face) : null).filter(Boolean);
   const wsM = mean(hours.map(t=>ws.get(t)));
