@@ -844,7 +844,8 @@ function buildCols(w){
     if(t < firstDay || t >= lastDay) return;
     if(!hist && t + step*H/2 < now) return;
     const night = t < sr - 1.5*H || t > ss + 0.5*H;
-    if(state.night==="hide" && (t < sr - 2*H || t > ss + H)) return;
+    // Nuit masquée : on garde de 2 h avant le lever à 2 h après le coucher (marées du soir et du matin visibles)
+    if(state.night==="hide" && (t + step*H/2 < sr - 2*H || t - step*H/2 > ss + 2*H)) return;
     cols.push({t, h, dk, night, now: now >= t - step*H/2 && now < t + step*H/2});
   });
   cols.sun = sun;
