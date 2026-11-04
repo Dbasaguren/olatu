@@ -103,6 +103,7 @@ table.fc tr.day th{height:auto;padding:6px 4px 5px;font:600 13px/1.15 var(--f-ui
 table.fc tr.day th.today{color:var(--today)}
 table.fc tr.day .sun{display:block;white-space:normal;font:500 11.5px/1.2 var(--f-data);color:var(--muted);margin-top:3px}
 table.fc tr.day .coef{display:block;white-space:normal;font:500 12.5px/1.2 var(--f-data);color:var(--muted);margin-top:4px}
+.pmh{font-weight:700;color:var(--ink);white-space:nowrap}
 .cf{display:inline-block;padding:1px 6px;border-radius:4px;font-size:15px;font-weight:700;color:var(--ink)}
 table.fc tr.hour td{color:var(--muted);font-size:12px;height:20px}
 table.fc td.n{background-image:linear-gradient(var(--night),var(--night))}
@@ -243,6 +244,11 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .wx-l{font:500 12.5px var(--f-data);color:var(--muted);font-variant-numeric:tabular-nums}
 .wx-l b{color:var(--ink);font-weight:600}
 .disp-btn{align-self:flex-end}
+/* Houle 1 / houle 2 */
+td.swc{cursor:pointer}
+.sw-pop{position:absolute;z-index:900;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;box-shadow:0 6px 20px rgba(0,0,0,.18);font:500 13px/1.5 var(--f-data);min-width:220px}
+.sw-pop b{display:block;font:700 13px var(--f-ui);margin-bottom:3px}
+.sw-pop span{display:inline-block;width:82px;color:var(--muted)}
 /* Bichomètre */
 .bicho-open{font-size:18px;text-decoration:none;opacity:.35}
 .bicho-open:hover{opacity:1}
@@ -380,7 +386,7 @@ td.bicho .bnorm{color:var(--muted)}
   <section class="legend" id="legend"></section>
 
   <section class="notes">
-    <p><b>Énergie (kJ)</b> = 0,49 × H² × T², énergie d'une vague par mètre de crête (H = hauteur significative en m, T = période de pic de la houle en s). 1 m à 10 s ≈ 49 kJ, 2 m à 14 s ≈ 384 kJ. À hauteur égale, une houle longue porte beaucoup plus d'énergie.</p>
+    <p><b>Énergie (kJ)</b> : énergie de la houle principale, même calcul que la ligne « Swell energy » de <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a> : E = ρ·g²·H²·T² / 16π ≈ 1,96 × H² × T² (H = hauteur de la houle en m, T = sa période en s). 1 m à 10 s ≈ 200 kJ, 2 m à 14 s ≈ 1 540 kJ. À hauteur égale, une houle longue porte beaucoup plus d'énergie. Pour bien la lire : <a href="https://www.surf-forecast.com/greenroom/how-surf-forecasts-wave-energy-tool-is-like-volume-for-surfboards/" target="_blank" rel="noopener">l'énergie des vagues expliquée par Surf-Forecast</a>. Touche une hauteur de houle dans le tableau pour voir la houle 1, la houle 2 et la mer du vent.</p>
     <p><b>Marée</b> calculée par analyse harmonique des mesures du marégraphe de Socoa (SHOM, 1990–2026, 54 ondes, cycle lunaire de 18,6 ans inclus). Testée sur 2025–2026, des années non utilisées pour le calcul : heure des PM/BM à 2 min près en médiane, hauteur à 7 cm. Hauteurs en mètres au-dessus du zéro hydrographique, comme dans l'annuaire. S'y ajoute la <b>surcote météo</b> : la mer monte d'environ 1 cm par hPa sous 1013 hPa et baisse au-dessus. Sur les jours de forte dépression, cette correction divise l'erreur par deux.</p>
     <p><b>Coefficient</b> calculé à partir de la marée astronomique de Brest (marégraphe SHOM, 2000–2026) : marnage / 6,10 m × 100, comme le coefficient officiel. Vérifié sur les grandes marées de 2015 (119), à ±3 environ.</p>
     <p><b>Houle</b> : modèle GFS-Wave 0,16° (NOAA), le même que Windguru, au large du spot (Météo-France en secours), sans effet de réfraction ni de bathymétrie locale. <b>Vent de synthèse</b> : AROME 1,3 km sur 2 jours, puis ARPEGE, puis ECMWF. <b>Note</b> indicative, calculée depuis l'énergie, la période et le vent par rapport à l'orientation de la plage.</p>
@@ -552,7 +558,7 @@ const GROUPS = [
   {id:"surf",  name:"Surf",   rows:[["note","Note /10"]]},
   {id:"houle", name:"Houle",  rows:[["houle","Hauteur"],["periode","Période"],["dirhoule","Direction"],["energie","Énergie (kJ)"]]},
   {id:"vent",  name:"Vent",   rows:[["vent","Vent moyen"],["rafales","Rafales"],["dirvent","Direction (off / on)"]]},
-  {id:"maree", name:"Marée",  rows:[["courbe","Courbe de marée"],["pmbm","Heures PM / BM"]]},
+  {id:"maree", name:"Marée",  rows:[["courbe","Courbe de marée"]]},
   {id:"fun",   name:"Fun",    rows:[["bicho","Bichomètre"]]},
 ];
 const BLOCKS = [["wavecmp","Houle · comparaison des modèles"], ...WIND_MODELS.map(m=>[m.id, m.name+" · "+m.info])];
@@ -620,7 +626,7 @@ async function fetchSpot(spot, force){
     hourly:"wave_height,wave_period,wave_peak_period,wave_direction", models:WAVE_MODELS.map(m=>m.id).join(",")}));
   // Houle du tableau : GFS-Wave 0,16° (NOAA), le modèle affiché par Windguru ; Météo-France en secours
   const gfs = getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, forecast_days:10, past_days:10,
-    hourly:"wave_height,wave_period,wave_direction", models:"ncep_gfswave016"}));
+    hourly:"wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_direction,secondary_swell_wave_height,secondary_swell_wave_period,secondary_swell_wave_direction,wind_wave_height,wind_wave_period,wind_wave_direction", models:"ncep_gfswave016"}));
   const [w, s, m, g] = await Promise.all([wind, sea, cmp, gfs]);
   const out = {at:Date.now(), w, s, m, g};
   cache[spot.id] = out;
@@ -770,12 +776,12 @@ function windComp(ws, wdir, face){ const r = (((wdir-face)%360+540)%360-180)*DEG
 function feat(hs, per, dir, ws, wdir, tide, rising, spot){
   if(hs==null || per==null) return null;
   const w = ws!=null && wdir!=null ? windComp(ws, wdir, spot.face) : {on:0, side:0};
-  return {hs, per, dir, ws, on:w.on, side:w.side, tide, rising, e:0.49*hs*hs*per*per};
+  return {hs, per, dir, ws, on:w.on, side:w.side, tide, rising, e:ENERGY(hs, per)};
 }
 // Note de base, avant tes sessions : énergie de la houle, période et vent par rapport à la plage
 function baseScore(f, spot){
   if(!f) return null;
-  let s = f.e>25 ? 10*clamp(Math.log(f.e/25)/Math.log(1300/25), 0, 1) : 0;   // seuils pour la période de pic
+  let s = f.e>100 ? 10*clamp(Math.log(f.e/100)/Math.log(5000/100), 0, 1) : 0;   // seuils pour l'énergie façon Windguru
   if(f.hs>3.5 && !spot.big) s = Math.min(s, 6);
   if(spot.big && f.hs<4) s = Math.min(s, 2);
   if(f.per<8) s -= 2; else if(f.per<10) s -= 1;
@@ -792,6 +798,12 @@ function similarity(a, b){
   let d2 = ((a.hs-b.hs)/(0.3*Math.max(0.6,(a.hs+b.hs)/2)))**2 + ((a.per-b.per)/2)**2 + ((a.on-b.on)/5)**2 + ((a.side-b.side)/7)**2;
   if(a.dir!=null && b.dir!=null) d2 += (angDiff(a.dir,b.dir)/30)**2;
   if(a.tide!=null && b.tide!=null) d2 += ((a.tide-b.tide)/0.8)**2 + (a.rising!==b.rising ? 0.3 : 0);
+  // Houle 1 / houle 2 (sessions notées depuis novembre 2026 ; ignoré pour les plus anciennes)
+  if(a.s1 && b.s1 && a.s1.d!=null && b.s1.d!=null) d2 += (angDiff(a.s1.d, b.s1.d)/30)**2;
+  if(a.s2 && b.s2){
+    d2 += ((a.s2.h - b.s2.h)/0.4)**2;
+    if(a.s2.h >= 0.3 && b.s2.h >= 0.3) d2 += ((a.s2.p - b.s2.p)/3)**2 + (a.s2.d!=null && b.s2.d!=null ? (angDiff(a.s2.d, b.s2.d)/40)**2 : 0);
+  }
   return Math.exp(-d2/2);
 }
 // Note finale : moyenne pondérée entre la note de base et tes notes dans des conditions proches
@@ -812,6 +824,8 @@ const scoreBg = v => `background:hsl(${Math.round(v*12)} 72% 76%);color:#122433`
 const arrow = (dir, title) => dir==null ? "–" : state.dirDeg
   ? `<span class="deg" title="${title}">${Math.round(dir)}°<span class="sub">${card(dir)}</span></span>`
   : `<svg class="arr" viewBox="0 0 20 20" style="transform:rotate(${(dir+180)%360}deg)" role="img" aria-label="${title}"><title>${title}</title><line x1="10" y1="19" x2="10" y2="7" stroke-width="2.2" stroke-linecap="round"/><path d="M10 0.8 L16 9 L10 7.2 L4 9 Z" stroke-width="0.6" stroke-linejoin="round"/></svg>`;
+// Énergie de la houle (kJ), même calcul que la ligne « Swell energy » de Windguru : ρ·g²·H²·T² / (16π) ≈ 1,96·H²·T²
+const ENERGY = (h, t) => 1.96*h*h*t*t;
 const fmt = (v, d=0) => v==null ? "–" : (d ? v.toFixed(d) : Math.round(v));
 
 // ---------- Rendu ----------
@@ -837,9 +851,31 @@ function buildCols(w){
   return cols;
 }
 
+let lastCols = [];
+const swTxt = x => x && x.h >= 0.1 ? `${x.h.toFixed(1)} m · ${Math.round(x.p)} s${x.d!=null ? ` · ${card(x.d)} (${Math.round(x.d)}°)` : ""}` : "–";
+function showSwellPop(cell){
+  const c = lastCols[+cell.dataset.i]; if(!c) return;
+  let pop = document.getElementById("swPop");
+  if(!pop){ pop = document.createElement("div"); pop.id = "swPop"; pop.className = "sw-pop"; document.body.appendChild(pop); }
+  const dt = new Date(c.t);
+  pop.innerHTML = `<b>${DAYS[dt.getUTCDay()]} ${dt.getUTCDate()} · ${c.h}h</b><div><span>Houle 1</span>${swTxt(c.s1)}</div><div><span>Houle 2</span>${swTxt(c.s2)}</div><div><span>Mer du vent</span>${swTxt(c.ww)}</div>`;
+  const r = cell.getBoundingClientRect();
+  pop.hidden = false;
+  pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left + r.width/2 - pop.offsetWidth/2)) + "px";
+  pop.style.top = (r.bottom + window.scrollY + 6) + "px";
+}
+document.addEventListener("click", e=>{
+  const cell = e.target.closest && e.target.closest("td.swc");
+  if(cell) return showSwellPop(cell);
+  const pop = document.getElementById("swPop"); if(pop && !e.target.closest("#swPop")) pop.hidden = true;
+});
 function render(spot, data){
   dark = matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme!=="light" || document.documentElement.dataset.theme==="dark";
   const {w, s, m, g} = data;
+  const GS = k => g ? series(g, k) : new Map();
+  const s1H = GS("swell_wave_height"), s1P = GS("swell_wave_period"), s1D = GS("swell_wave_direction");
+  const s2H = GS("secondary_swell_wave_height"), s2P = GS("secondary_swell_wave_period"), s2D = GS("secondary_swell_wave_direction");
+  const wwH = GS("wind_wave_height"), wwP = GS("wind_wave_period"), wwD = GS("wind_wave_direction");
   const gH = g ? series(g, "wave_height") : new Map(), gP = g ? series(g, "wave_period") : new Map(), gD = g ? series(g, "wave_direction") : new Map();
   const cols = buildCols(w);
   if(!cols.length){ document.getElementById("out").innerHTML = `<div class="block"><div class="msg"><b>Aucun créneau à afficher.</b>Affiche la nuit ou augmente le nombre de jours.</div></div>`; return; }
@@ -863,7 +899,10 @@ function render(spot, data){
     const H_ = gH.get(c.t) ?? hs.get(c.t), swH = sh.get(c.t);
     c.hs = H_; c.per = gP.get(c.t) ?? tpk.get(c.t) ?? tpe.get(c.t) ?? ((swH!=null && H_ && swH >= 0.5*H_ ? sp.get(c.t) : null) ?? tm.get(c.t) ?? sp.get(c.t));
     c.dir = gD.get(c.t) ?? sd.get(c.t) ?? wd.get(c.t);
-    c.e = H_!=null && c.per!=null ? 0.49*H_*H_*c.per*c.per : null;
+    // Houle 1 (principale), houle 2 (secondaire), mer du vent ; l'énergie se calcule sur la houle 1, comme Windguru
+    const sw = (H, P, D) => H.get(c.t)!=null ? {h:H.get(c.t), p:P.get(c.t), d:D.get(c.t)} : null;
+    c.s1 = sw(s1H, s1P, s1D); c.s2 = sw(s2H, s2P, s2D); c.ww = sw(wwH, wwP, wwD);
+    c.e = c.s1 && c.s1.p ? ENERGY(c.s1.h, c.s1.p) : H_!=null && c.per!=null ? ENERGY(H_, c.per) : null;
     c.ws = best("ws",c.t); c.wg = best("wg",c.t); c.wdir = best("wd",c.t);
     c.rel = c.wdir!=null ? windRel(c.wdir, spot.face) : null;
     c.sst = sst.get(c.t);
@@ -887,6 +926,7 @@ function render(spot, data){
     c.tide = lvlMap.get(c.t);
     const up = lvlMap.get(c.t+30*60e3), dn = lvlMap.get(c.t-30*60e3);
     c.f = feat(c.hs, c.per, c.dir, c.ws, c.wdir, c.tide, up!=null && dn!=null ? up>dn : null, spot);
+    if(c.f){ if(c.e!=null) c.f.e = c.e; c.f.s1 = c.s1; c.f.s2 = c.s2; }
     c.score = c.f ? scoreFor(c.f, spot) : null;
   });
   const mySess = state.sessions.filter(x=>x.f);
@@ -903,7 +943,8 @@ function render(spot, data){
     const dayRow = `<tr class="day"><th class="lab"></th>${days.map(d=>{
       const dt = new Date(tp(d.dk)), name = `${DAYS[dt.getUTCDay()]} ${dt.getUTCDate()}`;
       const cf = coefs[d.dk] || [];
-      const cfs = cf.length ? `<span class="coef">coef ${cf.map(v=>`<span class="cf" style="${cfStyle(v)}">${v}</span>`).join(" ")}</span>` : "";
+      const pmMax = ex.filter(e=>e.type==="PM" && dayKey(e.t)===d.dk).reduce((a, e)=>Math.max(a, e.v), -Infinity);
+      const cfs = cf.length ? `<span class="coef">coef ${cf.map(v=>`<span class="cf" style="${cfStyle(v)}">${v}</span>`).join(" ")}${pmMax > -Infinity ? ` <span class="pmh" title="Hauteur de la plus haute pleine mer du jour (Socoa)">PM ${pmMax.toFixed(1)} m</span>` : ""}</span>` : "";
       const sn = cols.sun[d.dk], sun = sn ? `<span class="sun" title="Lever et coucher du soleil">☀ ${hhmm(sn[0])} – ${hhmm(sn[1])}</span>` : "";
       return `<th colspan="${d.n}" class="ds${d.dk===todayKey?" today":""}" scope="colgroup">${d.dk===todayKey?"Aujourd'hui":name}${cfs}${sun}</th>`;
     }).join("")}</tr>`;
@@ -938,13 +979,6 @@ function render(spot, data){
     return `<td colspan="${d.n}" class="tide ds" style="padding:0"><svg width="${Wd}" height="${Hh}" viewBox="0 0 ${Wd} ${Hh}" aria-label="Courbe de marée"><defs><clipPath id="cl${d.dk}"><rect width="${Wd}" height="${Hh}"/></clipPath></defs><g clip-path="url(#cl${d.dk})"><path d="${area}" fill="var(--tide-fill)"/><path d="${path}" fill="none" stroke="var(--tide-line)" stroke-width="1.6"/>${marks}</g></svg></td>`;
   }).join("")}`;
 
-  // Toutes les pleines et basses mers de la journée (y compris la nuit)
-  const tideTimesRow = () => `${lab("PM / BM","heure · hauteur")}${days.map(d=>{
-    const list = ex.filter(e=>dayKey(e.t)===d.dk);
-    if(!list.length) return `<td colspan="${d.n}" class="ds dim">–</td>`;
-    return `<td colspan="${d.n}" class="ds tt"><div>${list.map(e=>`<span class="${e.type==="PM"?"pm":"bm"}"><i>${e.type==="PM"?"▲":"▼"}</i>${hhmm(e.t)}<em>${e.v.toFixed(1)}</em></span>`).join("")}</div></td>`;
-  }).join("")}`;
-
   // Bichomètre : un jour sur trois, alerte BB1 ; les autres jours, un niveau tiré au sort (fixe pour chaque date)
   const BICHO = ["Rien à l'horizon", "Quelques traces", "Zone fréquentée"];
   const bichoRow = () => `${lab("Bichomètre","pour rire")}${days.map(d=>{
@@ -966,7 +1000,7 @@ function render(spot, data){
 
   const R = {
     note:     `${lab("Note", spotSess ? "/10 · • = perso" : "/10 · aucune session")}${cols.map(noteCell).join("")}`,
-    houle:    `${lab("Hauteur","m")}${cRow("wave", c=>c.hs, v=>fmt(v,1))}`,
+    houle:    `${lab("Hauteur","m · touche")}${(()=>{ const st = rowStyles(cols, cols.map(c=>c.hs), scaleRgb("wave")); return cols.map((c, i)=>td(c, fmt(c.hs,1), "swc", `${st[i]} data-i="${i}"`)).join(""); })()}`,
     periode:  `${lab("Période","s")}${cRow("period", c=>c.per, fmt)}`,
     dirhoule: `${lab("Direction","selon le spot")}${cols.map(c=>{
       if(c.dir==null) return td(c, "–", "dim");
@@ -978,7 +1012,6 @@ function render(spot, data){
     rafales:  `${lab("Rafales","nœuds")}${cRow("wind", c=>c.wg, fmt)}`,
     dirvent:  `${lab("Direction","off / side / on")}${cols.map(c=>td(c, arrow(c.wdir, c.wdir==null?"":`Vent de ${card(c.wdir)} (${Math.round(c.wdir)}°), ${REL_TXT[c.rel]}`), "dirc "+(c.rel||""))).join("")}`,
     courbe:   tideRow(),
-    pmbm:     tideTimesRow(),
     bicho:    bichoRow(),
   };
   const body = GROUPS.filter(g=>g.id!=="fun" || APP.bicho).map(g=>{
@@ -1014,6 +1047,7 @@ function render(spot, data){
   }).join("");
 
   document.getElementById("out").innerHTML = synth + waveCmp + windBlocks;
+  lastCols = cols;
   if(state.view === "hist") document.querySelectorAll("#out .scroll").forEach(e=>{ e.scrollLeft = e.scrollWidth; });   // historique : on arrive sur les jours récents
 
   // En-tête du spot
@@ -1044,7 +1078,7 @@ function renderLegend(){
   document.getElementById("legend").innerHTML =
     sw("Houle","wave",[0.3,0.5,1,1.5,2,2.5,3,4,5,6],"m") +
     sw("Période","period",[8,10,11,12,13,14,15,16,18,20],"s") +
-    sw("Énergie","energy",[25,50,100,200,300,500,800,1200,2000],"kJ") +
+    sw("Énergie","energy",[50,100,150,200,250,300,350,600,1000,2000],"kJ") +
     sw("Vent","wind",[5,7,9,11,13,15,17,19,21,25,30],"nœuds") +
     `<div class="lg"><h3>Vent par rapport à la plage</h3><div class="rel"><span class="off-l" style="background:var(--off);color:var(--off-ink)">offshore · de terre</span><span style="background:var(--cross)">side-shore</span><span style="background:var(--on);color:var(--on-ink)">onshore · de mer</span></div></div>` +
     `<div class="lg"><h3>Direction de la houle pour le spot</h3><div class="rel"><span style="background:var(--off);color:var(--off-ink)">bonne</span><span style="background:var(--cross)">moyenne</span><span style="background:var(--on);color:var(--on-ink)">mauvaise</span></div></div>`;
@@ -1141,8 +1175,11 @@ function applyTheme(){
   renderLegend();
 }
 document.getElementById("segTheme").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; state.theme = b.dataset.v; syncSeg("segTheme", state.theme); applyAll(); });
-function applyAll(){ applyTheme(); persist(); renderWho(); renderSpots(); syncControls(); renderView(); if(last && last.spot.id===state.spot) render(last.spot, last.data); else show(false); }
+function applyAll(){ applyTheme(); persist(); const bo = document.getElementById("bichoOpen"); if(bo) bo.hidden = !(APP.bicho && shown("bicho")); renderWho(); renderSpots(); syncControls(); renderView(); if(last && last.spot.id===state.spot) render(last.spot, last.data); else show(false); }
 const dlg = document.getElementById("prefs");
+let prefsDirty = false;
+// Une case cochée ou décochée : on recharge la page en fermant, pour repartir d'un affichage propre
+dlg.addEventListener("close", ()=>{ if(prefsDirty){ prefsDirty = false; location.reload(); } });
 const openPrefs = () => { renderPrefs(); dlg.showModal(); };
 document.getElementById("custom").addEventListener("click", openPrefs);
 document.getElementById("who").addEventListener("click", openPrefs);
@@ -1156,7 +1193,7 @@ dlg.addEventListener("change", e=>{
   if(i.dataset.row){ state.hidden = state.hidden.filter(x=>x!==i.dataset.row); if(!i.checked) state.hidden.push(i.dataset.row); }
   else if(i.dataset.blk){ state.blocks[i.dataset.blk] = i.checked; }
   else return;
-  applyAll();
+  prefsDirty = true; applyAll();
 });
 document.getElementById("newProf").addEventListener("submit", e=>{
   e.preventDefault();
@@ -1449,7 +1486,7 @@ async function refreshMap(){
         if(!v) return;
         let html;
         if(state.mapLayer==="wind") html = `<b>Vent ${Math.round(v.v)} nds</b>${d!=null?`<br>De ${card(d)} (${Math.round(d)}°)`:""}`;
-        else { const p = sampleAt(D, "p", ti, lat, lng); html = `<b>Houle ${v.v.toFixed(1)} m</b>${p?` · ${Math.round(p.v)} s`:""}${d!=null?`<br>De ${card(d)} (${Math.round(d)}°)`:""}${p?`<br>Énergie ${Math.round(0.49*v.v*v.v*p.v*p.v)} kJ`:""}`; }
+        else { const p = sampleAt(D, "p", ti, lat, lng); html = `<b>Houle ${v.v.toFixed(1)} m</b>${p?` · ${Math.round(p.v)} s`:""}${d!=null?`<br>De ${card(d)} (${Math.round(d)}°)`:""}${p?`<br>Énergie ${Math.round(ENERGY(v.v, p.v))} kJ`:""}`; }
         L.popup({closeButton:false}).setLatLng(e.latlng).setContent(html).openOn(MAP.map);
       });
       loadLand().catch(err=>console.warn("Côtes non chargées :", err.message));
@@ -1588,7 +1625,7 @@ async function loadAppConfig(){
   save("appcfg", APP); applyAppConfig();
 }
 function applyAppConfig(){
-  document.getElementById("bichoOpen").hidden = !APP.bicho;
+  document.getElementById("bichoOpen").hidden = !(APP.bicho && shown("bicho"));
   if(!APP.bicho && bkDlg.open) bkDlg.close();
   if(last && (state.view==="fc" || state.view==="hist")) render(last.spot, last.data);
 }
@@ -1695,7 +1732,7 @@ async function fetchConditions(spot, date, h0, h1){
   const [mar, met, gfs] = await Promise.all([
     getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, hourly:"wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_peak_period,swell_wave_direction"})),
     getJSON("https://api.open-meteo.com/v1/forecast?"+qs({...common, hourly:"wind_speed_10m,wind_direction_10m,pressure_msl", wind_speed_unit:"kn"})),
-    getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, hourly:"wave_height,wave_period,wave_direction", models:"ncep_gfswave016"})).catch(()=>null),
+    getJSON("https://marine-api.open-meteo.com/v1/marine?"+qs({...common, hourly:"wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_direction,secondary_swell_wave_height,secondary_swell_wave_period,secondary_swell_wave_direction,wind_wave_height,wind_wave_period,wind_wave_direction", models:"ncep_gfswave016"})).catch(()=>null),
   ]);
   const hours = []; for(let h=h0; h<=Math.max(h0,h1); h++) hours.push(tp(date+"T"+String(h).padStart(2,"0")+":00"));
   const M = k => series(mar,k), W = k => series(met,k);
@@ -1717,6 +1754,11 @@ async function fetchConditions(spot, date, h0, h1){
   if(H_==null || per==null) throw new Error("Pas de données de houle pour cette date.");
   const f = feat(H_, per, dir, wsM, null, tide, rising, spot);
   if(comps.length){ f.on = mean(comps.map(c=>c.on)); f.side = mean(comps.map(c=>c.side)); }
+  // Houle 1 / houle 2 moyennes sur la session (GFS-Wave)
+  const swAvg = (hk, pk, dk) => { const hh = mean(hours.map(t=>G(hk).get(t))); return hh==null ? null : {h:hh, p:mean(hours.map(t=>G(pk).get(t))), d:circMean(hours.map(t=>G(dk).get(t)))}; };
+  f.s1 = swAvg("swell_wave_height","swell_wave_period","swell_wave_direction");
+  f.s2 = swAvg("secondary_swell_wave_height","secondary_swell_wave_period","secondary_swell_wave_direction");
+  if(f.s1 && f.s1.p) f.e = ENERGY(f.s1.h, f.s1.p);
   return f;
 }
 
@@ -1897,7 +1939,7 @@ function bkScan(){
 }
 function bkOpen(){ bkShowTab(); bkDlg.showModal(); }
 document.getElementById("bichoOpen").addEventListener("click", bkOpen);
-document.getElementById("bichoOpen").hidden = !APP.bicho;
+document.getElementById("bichoOpen").hidden = !(APP.bicho && shown("bicho"));
 document.getElementById("out").addEventListener("click", e=>{ if(APP.bicho && e.target.closest("tr.g-fun")) bkOpen(); });
 document.getElementById("bkGo").addEventListener("click", bkStart);
 document.getElementById("bkScanBtn").addEventListener("click", bkScan);
