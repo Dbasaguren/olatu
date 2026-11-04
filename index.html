@@ -246,6 +246,8 @@ td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;he
 .disp-btn{align-self:flex-end}
 /* Houle 1 / houle 2 */
 td.swc{cursor:pointer}
+table.fc tr.hour td.hcell{cursor:pointer}
+table.fc tr.hour td.hcell:hover{color:var(--accent)}
 .sw-pop{position:absolute;z-index:900;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;box-shadow:0 6px 20px rgba(0,0,0,.18);font:500 13px/1.5 var(--f-data);min-width:220px}
 .sw-pop b{display:block;font:700 13px var(--f-ui);margin-bottom:3px}
 .sw-pop span{display:inline-block;width:82px;color:var(--muted)}
@@ -951,7 +953,7 @@ function render(spot, data){
       const sn = cols.sun[d.dk], sun = sn ? `<span class="sun" title="Lever et coucher du soleil">☀ ${hhmm(sn[0])} – ${hhmm(sn[1])}</span>` : "";
       return `<th colspan="${d.n}" class="ds${d.dk===todayKey?" today":""}" scope="colgroup">${d.dk===todayKey?"Aujourd'hui":name}${cfs}${sun}</th>`;
     }).join("")}</tr>`;
-    const hourRow = `<tr class="hour">${lab("")}${cols.map(c=>td(c, `${c.h}h`, c.now?"now":"")).join("")}</tr>`;
+    const hourRow = `<tr class="hour">${lab("")}${cols.map(c=>td(c, `${c.h}h`, "hcell"+(c.now?" now":""), ` data-t="${c.t}" title="Toucher pour passer en ${state.step===3?"1 h":"3 h"}"`)).join("")}</tr>`;
     return dayRow + hourRow;
   };
 
@@ -1108,6 +1110,17 @@ function syncSeg(id, val){ document.querySelectorAll(`#${id} button`).forEach(b=
 function syncControls(){ syncSeg("segStep",state.step); syncSeg("segDays",state.days); syncSeg("segNight",state.night); syncSeg("segDir", state.dirDeg?"deg":"arrow"); }
 function toggleDir(deg){ state.dirDeg = deg; persist(); syncControls(); if(last) render(last.spot, last.data); }
 document.getElementById("segDir").addEventListener("click", e=>{ const b=e.target.closest("button"); if(b) toggleDir(b.dataset.v==="deg"); });
+// Toucher une heure de l'en-tête : bascule 3 h <-> 1 h, en gardant cette heure au même endroit à l'écran
+document.getElementById("out").addEventListener("click", e=>{
+  const h = e.target.closest("td.hcell"); if(!h || !last) return;
+  const sc = h.closest(".scroll"), t = +h.dataset.t, x = h.getBoundingClientRect().left;
+  state.step = state.step === 3 ? 1 : 3; persist(); syncControls(); render(last.spot, last.data);
+  // l'heure touchée existe toujours (3 h ⊂ 1 h) sauf en passant à 3 h depuis une heure intermédiaire : on prend la plus proche
+  const cells = [...document.querySelectorAll("#out .block.synth td.hcell")];
+  const near = cells.reduce((a, c)=>Math.abs(+c.dataset.t - t) < Math.abs(+a.dataset.t - t) ? c : a, cells[0]);
+  const nsc = document.querySelector("#out .block.synth .scroll");
+  if(near && nsc && sc) nsc.scrollLeft += near.getBoundingClientRect().left - x;
+});
 // Un clic sur n'importe quelle case de direction bascule flèches <-> degrés
 document.getElementById("out").addEventListener("click", e=>{ if(e.target.closest("td.dirc")) toggleDir(!state.dirDeg); });
 // Blocs détaillés repliés par défaut ; on retient ceux que l'utilisateur ouvre
