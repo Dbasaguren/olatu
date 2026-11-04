@@ -386,7 +386,7 @@ td.bicho .bnorm{color:var(--muted)}
   <section class="legend" id="legend"></section>
 
   <section class="notes">
-    <p><b>Énergie (kJ)</b> : énergie de la houle principale, même calcul que la ligne « Swell energy » de <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a> : E = ρ·g²·H²·T² / 16π ≈ 1,96 × H² × T² (H = hauteur de la houle en m, T = sa période en s). 1 m à 10 s ≈ 200 kJ, 2 m à 14 s ≈ 1 540 kJ. À hauteur égale, une houle longue porte beaucoup plus d'énergie. Pour bien la lire : <a href="https://www.surf-forecast.com/greenroom/how-surf-forecasts-wave-energy-tool-is-like-volume-for-surfboards/" target="_blank" rel="noopener">l'énergie des vagues expliquée par Surf-Forecast</a>. Touche une hauteur de houle dans le tableau pour voir la houle 1, la houle 2 et la mer du vent.</p>
+    <p><b>Énergie (kJ)</b> : somme de l'énergie de la houle 1, de la houle 2 et de la mer du vent, chacune calculée par E = ρ·g²·H²·T² / 16π ≈ 1,96 × H² × T² (H = hauteur en m, T = période en s), la même base que la ligne « Swell energy » de <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a>. Comme <a href="https://www.surfline.com" target="_blank" rel="noopener">Surfline</a>, on tient compte de toutes les houles et pas seulement de la principale : une houle de fond secondaire compte. Repère Surfline : environ 22 kJ pour une petite journée de 2-3 pieds en houle courte. 1 m à 10 s ≈ 200 kJ, 2 m à 14 s ≈ 1 540 kJ. À hauteur égale, une houle longue porte beaucoup plus d'énergie. Pour bien la lire : <a href="https://www.surf-forecast.com/greenroom/how-surf-forecasts-wave-energy-tool-is-like-volume-for-surfboards/" target="_blank" rel="noopener">l'énergie des vagues expliquée par Surf-Forecast</a>. Touche une hauteur de houle dans le tableau pour voir la houle 1, la houle 2 et la mer du vent.</p>
     <p><b>Marée</b> calculée par analyse harmonique des mesures du marégraphe de Socoa (SHOM, 1990–2026, 54 ondes, cycle lunaire de 18,6 ans inclus). Testée sur 2025–2026, des années non utilisées pour le calcul : heure des PM/BM à 2 min près en médiane, hauteur à 7 cm. Hauteurs en mètres au-dessus du zéro hydrographique, comme dans l'annuaire. S'y ajoute la <b>surcote météo</b> : la mer monte d'environ 1 cm par hPa sous 1013 hPa et baisse au-dessus. Sur les jours de forte dépression, cette correction divise l'erreur par deux.</p>
     <p><b>Coefficient</b> calculé à partir de la marée astronomique de Brest (marégraphe SHOM, 2000–2026) : marnage / 6,10 m × 100, comme le coefficient officiel. Vérifié sur les grandes marées de 2015 (119), à ±3 environ.</p>
     <p><b>Houle</b> : modèle GFS-Wave 0,16° (NOAA), le même que Windguru, au large du spot (Météo-France en secours), sans effet de réfraction ni de bathymétrie locale. <b>Vent de synthèse</b> : AROME 1,3 km sur 2 jours, puis ARPEGE, puis ECMWF. <b>Note</b> indicative, calculée depuis l'énergie, la période et le vent par rapport à l'orientation de la plage.</p>
@@ -824,7 +824,7 @@ const scoreBg = v => `background:hsl(${Math.round(v*12)} 72% 76%);color:#122433`
 const arrow = (dir, title) => dir==null ? "–" : state.dirDeg
   ? `<span class="deg" title="${title}">${Math.round(dir)}°<span class="sub">${card(dir)}</span></span>`
   : `<svg class="arr" viewBox="0 0 20 20" style="transform:rotate(${(dir+180)%360}deg)" role="img" aria-label="${title}"><title>${title}</title><line x1="10" y1="19" x2="10" y2="7" stroke-width="2.2" stroke-linecap="round"/><path d="M10 0.8 L16 9 L10 7.2 L4 9 Z" stroke-width="0.6" stroke-linejoin="round"/></svg>`;
-// Énergie de la houle (kJ), même calcul que la ligne « Swell energy » de Windguru : ρ·g²·H²·T² / (16π) ≈ 1,96·H²·T²
+// Énergie d'une composante de houle (kJ) : ρ·g²·H²·T² / (16π) ≈ 1,96·H²·T² (même base que Windguru) ; on additionne les composantes
 const ENERGY = (h, t) => 1.96*h*h*t*t;
 const fmt = (v, d=0) => v==null ? "–" : (d ? v.toFixed(d) : Math.round(v));
 
@@ -903,7 +903,9 @@ function render(spot, data){
     // Houle 1 (principale), houle 2 (secondaire), mer du vent ; l'énergie se calcule sur la houle 1, comme Windguru
     const sw = (H, P, D) => H.get(c.t)!=null ? {h:H.get(c.t), p:P.get(c.t), d:D.get(c.t)} : null;
     c.s1 = sw(s1H, s1P, s1D); c.s2 = sw(s2H, s2P, s2D); c.ww = sw(wwH, wwP, wwD);
-    c.e = c.s1 && c.s1.p ? ENERGY(c.s1.h, c.s1.p) : H_!=null && c.per!=null ? ENERGY(H_, c.per) : null;
+    // Énergie totale = somme des composantes (houle 1 + houle 2 + mer du vent), comme une lecture du spectre
+    const parts = [c.s1, c.s2, c.ww].filter(x=>x && x.h > 0 && x.p > 0);
+    c.e = parts.length ? parts.reduce((a, x)=>a + ENERGY(x.h, x.p), 0) : H_!=null && c.per!=null ? ENERGY(H_, c.per) : null;
     c.ws = best("ws",c.t); c.wg = best("wg",c.t); c.wdir = best("wd",c.t);
     c.rel = c.wdir!=null ? windRel(c.wdir, spot.face) : null;
     c.sst = sst.get(c.t);
@@ -1759,7 +1761,9 @@ async function fetchConditions(spot, date, h0, h1){
   const swAvg = (hk, pk, dk) => { const hh = mean(hours.map(t=>G(hk).get(t))); return hh==null ? null : {h:hh, p:mean(hours.map(t=>G(pk).get(t))), d:circMean(hours.map(t=>G(dk).get(t)))}; };
   f.s1 = swAvg("swell_wave_height","swell_wave_period","swell_wave_direction");
   f.s2 = swAvg("secondary_swell_wave_height","secondary_swell_wave_period","secondary_swell_wave_direction");
-  if(f.s1 && f.s1.p) f.e = ENERGY(f.s1.h, f.s1.p);
+  const ww = swAvg("wind_wave_height","wind_wave_period","wind_wave_direction");
+  const parts = [f.s1, f.s2, ww].filter(x=>x && x.h > 0 && x.p > 0);
+  if(parts.length) f.e = parts.reduce((a, x)=>a + ENERGY(x.h, x.p), 0);
   return f;
 }
 
