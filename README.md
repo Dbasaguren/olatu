@@ -1,4 +1,4 @@
-# Olatuz
+# Olatuak
 
 Prévisions surf pour la côte basque française, de La Barre à Hendaye : houle, période, énergie des vagues, vent offshore ou onshore, marée de Socoa et coefficient.
 
