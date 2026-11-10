@@ -275,6 +275,9 @@ table.fc tr.hour td.hcell:hover{color:var(--accent)}
 /* Bonnes directions */
 .dirgrid{display:grid;grid-template-columns:auto auto auto auto;gap:6px 8px;align-items:center;justify-content:start;font-size:14px}
 .dirgrid input{width:64px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line-strong);border-radius:6px;padding:5px 6px}
+/* Créer ton spot */
+.ns-map{height:min(50vh,380px);border-radius:8px;border:1px solid var(--line);margin:8px 0 12px}
+.sp-del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:4px 6px;margin-left:auto}
 /* Bichomètre */
 .bicho-open{font-size:18px;text-decoration:none;opacity:.35}
 .bicho-open:hover{opacity:1}
@@ -524,7 +527,28 @@ td.bicho .bnorm{color:var(--muted)}
   <div class="pd-head"><h2 id="spTitle">Mes spots</h2><button class="btn" type="button" data-close>Fermer</button></div>
   <div class="pd-body">
     <p class="pd-hint">Touche ★ pour mettre un spot en favori : il apparaît en haut de l'écran. Touche le nom d'un spot pour voir ses prévisions.</p>
+    <div class="acc-btns"><button class="btn primary" type="button" id="newSpotBtn">+ Créer ton spot</button></div>
     <div class="sp-list" id="spotPick"></div>
+  </div>
+</dialog>
+
+<dialog class="prefs" id="newSpotDlg" aria-labelledby="nsTitle">
+  <div class="pd-head"><h2 id="nsTitle">Créer ton spot</h2><button class="btn" type="button" data-close>Fermer</button></div>
+  <div class="pd-body">
+    <p class="pd-hint">1. Touche la carte pour placer ton spot, dans l'eau juste devant le pic. Zoome pour être précis. La zone est limitée au golfe de Gascogne, là où la marée de Socoa reste valable.</p>
+    <div id="nsMap" class="ns-map"></div>
+    <form class="sform" id="nsForm">
+      <p class="pd-hint" id="nsWhere">Aucun point placé.</p>
+      <label class="gl">2. Nom du spot<input id="nsName" maxlength="30" required placeholder="Ex. : Le pic du phare"></label>
+      <label class="gl">Commune<input id="nsTown" maxlength="30" required placeholder="Remplie quand tu places le spot"></label>
+      <p class="pd-hint">3. À toi de dire quelles directions marchent ici (0° = nord, 90° = est, 180° = sud, 270° = ouest). Le vent : celui qui vient de la terre, offshore.</p>
+      <div class="dirgrid">
+        <span>Bonne houle de</span><label><input type="number" id="nsSw0" min="0" max="359" inputmode="numeric" required aria-label="Bonne houle : de (degrés)">°</label><span>à</span><label><input type="number" id="nsSw1" min="0" max="359" inputmode="numeric" required aria-label="Bonne houle : à (degrés)">°</label>
+        <span>Bon vent de</span><label><input type="number" id="nsWi0" min="0" max="359" inputmode="numeric" required aria-label="Bon vent : de (degrés)">°</label><span>à</span><label><input type="number" id="nsWi1" min="0" max="359" inputmode="numeric" required aria-label="Bon vent : à (degrés)">°</label>
+      </div>
+      <p class="fmsg" id="nsMsg" role="status"></p>
+      <div><button class="btn primary" type="submit">Créer le spot</button></div>
+    </form>
   </div>
 </dialog>
 
@@ -621,10 +645,16 @@ if(!store || !store.users || !store.users[store.current]){
   store = {current:"Moi", users:{"Moi":me}};
 }
 let state;
+// Spots créés par l'utilisateur (réglages perso, state.mySpots) ajoutés à la suite des spots officiels
+const BASE_SPOTS = SPOTS.length;
+function syncCustomSpots(){
+  SPOTS.length = BASE_SPOTS; SPOTS.push(...(state.mySpots || []));
+  if(!SPOTS.some(s=>s.id===state.spot)) state.spot = "cenitz";
+}
 function useProfile(name){
   store.current = name;
   state = store.users[name] = {...defaultPrefs(), ...store.users[name]};
-  if(!SPOTS.some(s=>s.id===state.spot)) state.spot = "cenitz";
+  syncCustomSpots();
 }
 useProfile(store.current);
 // Compte Supabase (clé publique : la sécurité est assurée par les règles d'accès de la base)
@@ -783,6 +813,7 @@ function rowStyles(cols, vals, colorFn){
 // Plages « bonne direction » (degrés, sens horaire de a à b) : réglage perso par spot, sinon par défaut
 const norm = d => ((Math.round(d)%360)+360)%360;
 function defaultDirs(spot){
+  if(spot.custom) return {sw:spot.sw, wi:spot.wi};
   const [best, win] = SWELL[spot.id] || [spot.face], g = (win || [20])[0];
   return {sw:[norm(best-g), norm(best+g)], wi:[norm(spot.face+135), norm(spot.face+225)]};
 }
@@ -1160,10 +1191,10 @@ function renderSpots(){
 // Choix des spots favoris
 const spotsDlg = document.getElementById("spotsDlg");
 function renderSpotPicker(){
-  const towns = [...new Set(SPOTS.map(x=>x.town))];
-  document.getElementById("spotPick").innerHTML = towns.map(t=>`<div class="sp-town"><h4>${t}</h4>${SPOTS.filter(x=>x.town===t).map(x=>{
+  const grp = x => x.custom ? "Mes spots créés" : x.town, towns = [...new Set(SPOTS.map(grp))];
+  document.getElementById("spotPick").innerHTML = towns.map(t=>`<div class="sp-town"><h4>${t}</h4>${SPOTS.filter(x=>grp(x)===t).map(x=>{
     const fav = (state.favs||[]).includes(x.id);
-    return `<div class="sp-row${x.id===state.spot?" cur":""}"><button type="button" class="sp-star" data-fav="${x.id}" aria-pressed="${fav}" aria-label="${fav?"Retirer":"Ajouter"} ${x.name} ${fav?"des":"aux"} favoris">${fav?"★":"☆"}</button><button type="button" class="sp-go" data-go="${x.id}">${x.name}${x.big?' <em>grosse houle</em>':x.reef?' <em>reef</em>':""}${CAMS[x.id]?' <em>webcam</em>':""}</button></div>`;
+    return `<div class="sp-row${x.id===state.spot?" cur":""}"><button type="button" class="sp-star" data-fav="${x.id}" aria-pressed="${fav}" aria-label="${fav?"Retirer":"Ajouter"} ${x.name} ${fav?"des":"aux"} favoris">${fav?"★":"☆"}</button><button type="button" class="sp-go" data-go="${x.id}">${x.name}${x.big?' <em>grosse houle</em>':x.reef?' <em>reef</em>':""}${CAMS[x.id]?' <em>webcam</em>':""}${x.custom?` <em>${x.town}</em>`:""}</button>${x.custom?`<button type="button" class="sp-del" data-delspot="${x.id}" aria-label="Supprimer ${x.name}">✕</button>`:""}</div>`;
   }).join("")}</div>`).join("");
 }
 function syncSeg(id, val){ document.querySelectorAll(`#${id} button`).forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.v==String(val)))); }
@@ -1212,6 +1243,16 @@ spotsDlg.addEventListener("click", e=>{
   if(e.target===spotsDlg || e.target.closest("[data-close]")) return spotsDlg.close();
   const f = e.target.closest("[data-fav]");
   if(f){ const id = f.dataset.fav; state.favs = (state.favs||[]).includes(id) ? state.favs.filter(x=>x!==id) : [...(state.favs||[]), id]; persist(); renderSpotPicker(); renderSpots(); return; }
+  const ds = e.target.closest("[data-delspot]");
+  if(ds){
+    const id = ds.dataset.delspot, sp = SPOTS.find(x=>x.id===id);
+    if(!confirm(`Supprimer ton spot « ${sp.name} » ? Ses sessions notées restent dans ta liste.`)) return;
+    state.mySpots = (state.mySpots||[]).filter(x=>x.id!==id);
+    state.favs = (state.favs||[]).filter(x=>x!==id);
+    if(state.dirs) delete state.dirs[id];
+    syncCustomSpots(); persist(); renderSpotPicker(); renderSpots(); show(false); return;
+  }
+  if(e.target.closest("#newSpotBtn")){ spotsDlg.close(); openNewSpot(); return; }
   const g = e.target.closest("[data-go]");
   if(g){ state.spot = g.dataset.go; persist(); renderSpots(); renderView(); spotsDlg.close(); show(false); }
 });
@@ -1254,7 +1295,7 @@ function applyTheme(){
   renderLegend();
 }
 document.getElementById("segTheme").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; state.theme = b.dataset.v; syncSeg("segTheme", state.theme); applyAll(); });
-function applyAll(){ applyTheme(); persist(); const bo = document.getElementById("bichoOpen"); if(bo) bo.hidden = !(APP.bicho && shown("bicho")); renderWho(); renderSpots(); syncControls(); renderView(); if(last && last.spot.id===state.spot) render(last.spot, last.data); else show(false); }
+function applyAll(){ syncCustomSpots(); applyTheme(); persist(); const bo = document.getElementById("bichoOpen"); if(bo) bo.hidden = !(APP.bicho && shown("bicho")); renderWho(); renderSpots(); syncControls(); renderView(); if(last && last.spot.id===state.spot) render(last.spot, last.data); else show(false); }
 const dlg = document.getElementById("prefs");
 let prefsDirty = false;
 // Une case cochée ou décochée : on recharge la page en fermant, pour repartir d'un affichage propre
@@ -1660,8 +1701,62 @@ document.getElementById("dispBtn").addEventListener("click", ()=>{ state.showCtl
 document.getElementById("viewTabs").addEventListener("click", e=>{ const b = e.target.closest("[data-view]"); if(!b) return; state.view = b.dataset.view; persist(); renderView(); });
 document.getElementById("segLayer").addEventListener("click", e=>{ const b = e.target.closest("button"); if(!b) return; state.mapLayer = b.dataset.v; persist(); renderView(); });
 
-applyTheme(); renderWho(); renderSpots(); syncControls(); renderView(); show(false);
+syncCustomSpots(); applyTheme(); renderWho(); renderSpots(); syncControls(); renderView(); show(false);
 
+
+
+// ---------- Créer ton spot ----------
+const nsDlg = document.getElementById("newSpotDlg"), NS = {map:null, marker:null, lat:null, lon:null};
+const NS_BOUNDS = [[42.9,-4.6],[46.4,-0.9]];   // golfe de Gascogne : la marée de Socoa y reste proche de la réalité
+const clean = t => t.replace(/[<>&"']/g, "").trim();
+function nsMsg(t, err){ const m = document.getElementById("nsMsg"); m.textContent = t || ""; m.className = "fmsg" + (err ? " err" : ""); }
+async function openNewSpot(){
+  nsDlg.showModal(); nsMsg("");
+  try{
+    if(!window.L){
+      loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css");
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js");
+    }
+  }catch(e){ return nsMsg("Carte indisponible : " + e.message, true); }
+  if(NS.map){ NS.map.invalidateSize(); return; }
+  const cur = SPOTS.find(x=>x.id===state.spot);
+  const m = NS.map = L.map("nsMap", {center:[cur.lat, cur.lon], zoom:13, minZoom:7, maxBounds:NS_BOUNDS, maxBoundsViscosity:1});
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:18, attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(m);
+  m.attributionControl.setPrefix("");
+  m.on("click", async e=>{
+    const {lat, lng} = e.latlng;
+    if(!L.latLngBounds(NS_BOUNDS).contains(e.latlng)) return;
+    NS.lat = +lat.toFixed(4); NS.lon = +lng.toFixed(4);
+    if(NS.marker) NS.marker.setLatLng(e.latlng); else NS.marker = L.marker(e.latlng).addTo(m);
+    document.getElementById("nsWhere").textContent = `Spot placé : ${NS.lat}, ${NS.lon}`;
+    try{   // commune la plus proche (OpenStreetMap / Nominatim, une requête par point placé)
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&accept-language=fr&lat=${NS.lat}&lon=${NS.lon}`);
+      const a = (await r.json()).address || {};
+      const town = a.city || a.town || a.village || a.municipality || a.county;
+      if(town) document.getElementById("nsTown").value = clean(town).slice(0, 30);
+    }catch(_){ /* pas grave : l'utilisateur tape la commune */ }
+  });
+  setTimeout(()=>m.invalidateSize(), 50);
+}
+nsDlg.addEventListener("click", e=>{ if(e.target===nsDlg || e.target.closest("[data-close]")) nsDlg.close(); });
+document.getElementById("nsForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  if(NS.lat==null) return nsMsg("Touche d'abord la carte pour placer ton spot.", true);
+  const num = id => norm(parseFloat(document.getElementById(id).value));
+  const sw = [num("nsSw0"), num("nsSw1")], wi = [num("nsWi0"), num("nsWi1")];
+  if([...sw, ...wi].some(Number.isNaN)) return nsMsg("Indique les 4 directions en degrés.", true);
+  const name = clean(document.getElementById("nsName").value), town = clean(document.getElementById("nsTown").value);
+  if(!name || !town) return nsMsg("Donne un nom et une commune à ton spot.", true);
+  // Orientation de la plage déduite du bon vent : la plage regarde à l'opposé du vent de terre
+  const sp = {id:"u"+Date.now().toString(36), town, name, lat:NS.lat, lon:NS.lon, face:norm(arcMid(wi)+180), custom:true, sw, wi};
+  state.mySpots = [...(state.mySpots||[]), sp];
+  state.favs = [...(state.favs||[]), sp.id];
+  state.spot = sp.id;
+  syncCustomSpots(); persist(); renderSpots(); renderView(); show(false);
+  e.target.reset(); NS.lat = NS.lon = null; if(NS.marker){ NS.marker.remove(); NS.marker = null; }
+  document.getElementById("nsWhere").textContent = "Aucun point placé.";
+  nsDlg.close();
+});
 
 // ---------- Compte : connexion, synchronisation ----------
 const rowToSess = r => ({id:r.id, spot:r.spot, date:r.date, h0:r.h0, h1:r.h1, rating:r.rating, note:r.note||"", f:r.f, savedAt:r.saved_at});
