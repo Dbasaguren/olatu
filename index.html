@@ -375,7 +375,7 @@ td.bicho .bnorm{color:var(--muted)}
     <div>
       <h2 id="spotName">–</h2>
       <div class="meta" id="spotMeta"></div>
-      <div class="sess-bar"><button class="btn primary" id="logBtn" type="button">+ Noter une session</button><button class="btn" id="mySess" type="button">Mes sessions</button><a class="btn cam" id="camBtn" href="#" target="_blank" rel="noopener" hidden>Webcam ↗</a></div>
+      <div class="sess-bar"><button class="btn primary" id="logBtn" type="button">+ Noter une session</button><button class="btn" id="mySess" type="button">Mes sessions</button><button class="btn" id="dirBtn" type="button">Personnaliser le spot</button><a class="btn cam" id="camBtn" href="#" target="_blank" rel="noopener" hidden>Webcam ↗</a></div>
     </div>
     <button class="btn disp-btn" id="dispBtn" type="button" aria-expanded="false">Affichage ▾</button>
     <div class="controls">
@@ -463,15 +463,6 @@ td.bicho .bnorm{color:var(--muted)}
       <p class="pd-hint">Sans compte, chaque profil garde ses réglages et ses sessions dans ce navigateur uniquement.</p>
     </section>
     <section class="pd-sec">
-      <h3 id="dirTitle">Bonnes directions</h3>
-      <div class="dirgrid">
-        <span>Houle venant de</span><label><input type="number" id="dSw0" min="0" max="359" inputmode="numeric" aria-label="Houle : de (degrés)">°</label><span>à</span><label><input type="number" id="dSw1" min="0" max="359" inputmode="numeric" aria-label="Houle : à (degrés)">°</label>
-        <span>Vent venant de</span><label><input type="number" id="dWi0" min="0" max="359" inputmode="numeric" aria-label="Vent : de (degrés)">°</label><span>à</span><label><input type="number" id="dWi1" min="0" max="359" inputmode="numeric" aria-label="Vent : à (degrés)">°</label>
-      </div>
-      <div class="acc-btns"><button class="btn" type="button" id="dirReset">Valeurs par défaut</button></div>
-      <p class="pd-hint">Pour le spot affiché. Sens des aiguilles d'une montre : 0° = nord, 90° = est, 180° = sud, 270° = ouest. Ex. houle 280° à 320° = ouest-nord-ouest à nord-ouest. Ces plages colorent les lignes Direction et comptent dans la note.</p>
-    </section>
-    <section class="pd-sec">
       <h3>Lignes du tableau</h3>
       <div class="rowgrid" id="rowChecks"></div>
     </section>
@@ -549,6 +540,20 @@ td.bicho .bnorm{color:var(--muted)}
       <p class="fmsg" id="nsMsg" role="status"></p>
       <div><button class="btn primary" type="submit">Créer le spot</button></div>
     </form>
+  </div>
+</dialog>
+
+<dialog class="prefs" id="dirDlg" aria-labelledby="dirTitle">
+  <div class="pd-head"><h2 id="dirTitle">Bonnes directions</h2><button class="btn" type="button" data-close>Fermer</button></div>
+  <div class="pd-body">
+    <section class="pd-sec">
+      <div class="dirgrid">
+        <span>Houle venant de</span><label><input type="number" id="dSw0" min="0" max="359" inputmode="numeric" aria-label="Houle : de (degrés)">°</label><span>à</span><label><input type="number" id="dSw1" min="0" max="359" inputmode="numeric" aria-label="Houle : à (degrés)">°</label>
+        <span>Vent venant de</span><label><input type="number" id="dWi0" min="0" max="359" inputmode="numeric" aria-label="Vent : de (degrés)">°</label><span>à</span><label><input type="number" id="dWi1" min="0" max="359" inputmode="numeric" aria-label="Vent : à (degrés)">°</label>
+      </div>
+      <div class="acc-btns"><button class="btn" type="button" id="dirReset">Valeurs par défaut</button></div>
+      <p class="pd-hint">Pour le spot affiché. Sens des aiguilles d'une montre : 0° = nord, 90° = est, 180° = sud, 270° = ouest. Ex. houle 280° à 320° = ouest-nord-ouest à nord-ouest. Ces plages colorent les lignes Direction et comptent dans la note.</p>
+    </section>
   </div>
 </dialog>
 
@@ -1283,10 +1288,23 @@ function renderPrefs(){
   document.getElementById("delProf").hidden = !!account;
   renderAccount();
   syncSeg("segTheme", state.theme || "auto");
+}
+// Bonnes directions du spot affiché (bouton à côté de « Mes sessions »)
+const dirDlg = document.getElementById("dirDlg");
+function renderDirs(){
   const sp = SPOTS.find(x=>x.id===state.spot), dd = spotDirs(sp);
   document.getElementById("dirTitle").textContent = `Bonnes directions · ${sp.name}`;
   [["dSw0",dd.sw[0]],["dSw1",dd.sw[1]],["dWi0",dd.wi[0]],["dWi1",dd.wi[1]]].forEach(([id,v])=>document.getElementById(id).value = v);
 }
+document.getElementById("dirBtn").addEventListener("click", ()=>{ renderDirs(); dirDlg.showModal(); });
+dirDlg.addEventListener("click", e=>{ if(e.target===dirDlg || e.target.closest("[data-close]")) dirDlg.close(); });
+dirDlg.addEventListener("change", ()=>{
+  const v = id => { const n = parseFloat(document.getElementById(id).value); return Number.isFinite(n) ? norm(n) : null; };
+  const sw = [v("dSw0"), v("dSw1")], wi = [v("dWi0"), v("dWi1")];
+  if([...sw, ...wi].includes(null)) return;   // champ vide : on attend une valeur
+  state.dirs = {...(state.dirs||{}), [state.spot]: {sw, wi}};
+  applyAll();
+});
 function applyTheme(){
   const t = state.theme || "auto", root = document.documentElement;
   if(t==="auto") delete root.dataset.theme; else root.dataset.theme = t;
@@ -1312,12 +1330,6 @@ dlg.addEventListener("change", e=>{
   const i = e.target;
   if(i.dataset.row){ state.hidden = state.hidden.filter(x=>x!==i.dataset.row); if(!i.checked) state.hidden.push(i.dataset.row); }
   else if(i.dataset.blk){ state.blocks[i.dataset.blk] = i.checked; }
-  else if(/^d(Sw|Wi)[01]$/.test(i.id)){
-    const v = id => { const n = parseFloat(document.getElementById(id).value); return Number.isFinite(n) ? norm(n) : null; };
-    const sw = [v("dSw0"), v("dSw1")], wi = [v("dWi0"), v("dWi1")];
-    if([...sw, ...wi].includes(null)) return;   // champ vide : on attend une valeur
-    state.dirs = {...(state.dirs||{}), [state.spot]: {sw, wi}};
-  }
   else return;
   prefsDirty = true; applyAll();
 });
@@ -1334,7 +1346,7 @@ document.getElementById("delProf").addEventListener("click", ()=>{
 });
 document.getElementById("dirReset").addEventListener("click", ()=>{
   if(state.dirs) delete state.dirs[state.spot];
-  renderPrefs(); prefsDirty = true; applyAll();
+  renderDirs(); applyAll();
 });
 document.getElementById("resetProf").addEventListener("click", ()=>{
   state.hidden = []; BLOCKS.forEach(([id])=>state.blocks[id] = true); renderPrefs(); applyAll();
