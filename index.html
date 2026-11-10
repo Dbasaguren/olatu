@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Olatuak</title>
-<meta name="description" content="Olatuak : prévisions surf gratuites de la côte basque, d'Anglet à Hendaye. Houle, période, énergie, vent offshore, marée de Socoa et coefficient, carte de la houle sur le monde entier.">
+<meta name="description" content="Olatuak : prévisions surf gratuites de la côte basque et des Landes, de Biscarrosse à Hendaye. Houle, période, énergie, vent offshore, marée de Socoa et coefficient, carte de la houle sur le monde entier.">
 <link rel="canonical" href="https://olatuak.eu/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Olatuak">
 <meta property="og:title" content="Olatuak · Prévisions surf Côte basque">
-<meta property="og:description" content="Houle, vent, marée et coefficient pour 24 spots, d'Anglet à Hendaye. Gratuit, installable sur téléphone.">
+<meta property="og:description" content="Houle, vent, marée et coefficient pour 28 spots, de Biscarrosse à Hendaye. Gratuit, installable sur téléphone.">
 <meta property="og:url" content="https://olatuak.eu/">
 <meta property="og:image" content="https://olatuak.eu/icons/icon-512.png">
 <meta property="og:locale" content="fr_FR">
@@ -313,6 +313,7 @@ td.bicho .bnorm{color:var(--muted)}
 .spot.allspots small{color:var(--muted)}
 .sp-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 22px}
 .sp-town h4{margin:0 0 4px;font:600 11.5px var(--f-ui);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.sp-reg{grid-column:1/-1;margin:6px 0 -4px;font:700 15px var(--f-ui);border-bottom:1px solid var(--line);padding-bottom:4px}
 .sp-row{display:flex;align-items:center;gap:4px;border-radius:6px}
 .sp-row.cur{background:var(--accent-soft)}
 .sp-star{border:0;background:none;font-size:20px;line-height:1;width:34px;height:34px;color:var(--line-strong);flex:0 0 auto}
@@ -613,6 +614,12 @@ const SPOTS = [
   {id:"belharra",    town:"Urrugne",           name:"Belharra",          lat:43.405, lon:-1.665, face:315, big:true},
   {id:"deuxjumeaux", town:"Hendaye",           name:"Les Deux Jumeaux",  lat:43.380, lon:-1.763, face:340, reef:true},
   {id:"hendaye",     town:"Hendaye",           name:"Grande Plage",      lat:43.375, lon:-1.772, face:345},
+  // Landes (côte rectiligne face à l'ouest ; marée de Socoa, à quelques minutes près)
+  {id:"labenne",     town:"Labenne",           name:"Labenne Océan",     lat:43.5955, lon:-1.4605, face:280, region:"Landes"},
+  {id:"graviere",    town:"Hossegor",          name:"La Gravière",       lat:43.6705, lon:-1.4440, face:280, region:"Landes"},
+  {id:"penon",       town:"Seignosse",         name:"Le Penon",          lat:43.7080, lon:-1.4370, face:280, region:"Landes"},
+  {id:"messanges",   town:"Messanges",         name:"Messanges",         lat:43.8135, lon:-1.4040, face:280, region:"Landes"},
+  {id:"biscarrosse", town:"Biscarrosse",       name:"Biscarrosse Plage", lat:44.4470, lon:-1.2560, face:280, region:"Landes"},
 ];
 const WIND_MODELS = [
   {id:"meteofrance_arome_france_hd", name:"AROME HD", info:"Météo-France · 1,3 km · 2 jours"},
@@ -856,6 +863,7 @@ const SWELL = {
   mayarco:[300], lafitenia:[305], gauchelafit:[300], erromardie:[315],
   saintebarbe:[320,[15,35]], bougie:[315,[15,35]], belharra:[305],
   deuxjumeaux:[320,[15,35]], hendaye:[320,[15,35]],
+  labenne:[285,[25]], graviere:[285,[25]], penon:[285,[25]], messanges:[285,[25]], biscarrosse:[285,[25]],
 };
 function swellFit(dir, spot){
   const arc = spotDirs(spot).sw, d = arcGap(dir, arc);
@@ -1196,7 +1204,8 @@ function renderSpots(){
 const spotsDlg = document.getElementById("spotsDlg");
 function renderSpotPicker(){
   const grp = x => x.custom ? "Mes spots créés" : x.town, towns = [...new Set(SPOTS.map(grp))];
-  document.getElementById("spotPick").innerHTML = towns.map(t=>`<div class="sp-town"><h4>${t}</h4>${SPOTS.filter(x=>grp(x)===t).map(x=>{
+  const reg = t => { const x = SPOTS.find(y=>grp(y)===t); return x.custom ? "" : x.region || "Pays basque"; };
+  document.getElementById("spotPick").innerHTML = towns.map((t,i)=>`${reg(t) && reg(t)!==(i ? reg(towns[i-1]) : "") ? `<h3 class="sp-reg">${reg(t)}</h3>` : ""}<div class="sp-town"><h4>${t}</h4>${SPOTS.filter(x=>grp(x)===t).map(x=>{
     const fav = (state.favs||[]).includes(x.id);
     return `<div class="sp-row${x.id===state.spot?" cur":""}"><button type="button" class="sp-star" data-fav="${x.id}" aria-pressed="${fav}" aria-label="${fav?"Retirer":"Ajouter"} ${x.name} ${fav?"des":"aux"} favoris">${fav?"★":"☆"}</button><button type="button" class="sp-go" data-go="${x.id}">${x.name}${x.big?' <em>grosse houle</em>':x.reef?' <em>reef</em>':""}${CAMS[x.id]?' <em>webcam</em>':""}${x.custom?` <em>${x.town}</em>`:""}</button>${x.custom?`<button type="button" class="sp-del" data-delspot="${x.id}" aria-label="Supprimer ${x.name}">✕</button>`:""}</div>`;
   }).join("")}</div>`).join("");
