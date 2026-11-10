@@ -82,3 +82,38 @@ create policy "Seul l'admin modifie la config" on public.app_config for all to a
 grant select on public.app_config to anon, authenticated;
 grant insert, update on public.app_config to authenticated;
 insert into public.app_config (key, value) values ('bicho_enabled', 'true') on conflict (key) do nothing;
+
+-- Ajout 2026-11 : visites (date, durée, appareil) des comptes, lisibles uniquement par l'admin
+create table if not exists public.visits (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  started_at timestamptz not null default now(),
+  last_seen timestamptz not null default now(),
+  seconds integer not null default 0,
+  device text
+);
+create index if not exists visits_user_idx on public.visits(user_id);
+alter table public.visits enable row level security;
+drop policy if exists "Chacun crée ses visites" on public.visits;
+create policy "Chacun crée ses visites" on public.visits for insert to authenticated with check (user_id = (select auth.uid()));
+drop policy if exists "Chacun met à jour ses visites" on public.visits;
+create policy "Chacun met à jour ses visites" on public.visits for update to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+drop policy if exists "Lecture : soi-même ou admin" on public.visits;
+create policy "Lecture : soi-même ou admin" on public.visits for select to authenticated
+  using (user_id = (select auth.uid()) or exists (select 1 from public.admins a where a.user_id = (select auth.uid())));
+revoke all on public.visits from anon;
+grant select, insert, update on public.visits to authenticated;
+
+create or replace function public.admin_user_stats()
+returns table(email text, created_at timestamptz, last_visit timestamptz, visits bigint, minutes numeric, device text)
+language sql security definer set search_path = ''
+as $$
+  select u.email::text, u.created_at, max(v.last_seen), count(v.id), round(coalesce(sum(v.seconds), 0) / 60.0, 1),
+         (select v2.device from public.visits v2 where v2.user_id = u.id order by v2.last_seen desc limit 1)
+  from auth.users u left join public.visits v on v.user_id = u.id
+  where exists (select 1 from public.admins a where a.user_id = auth.uid())
+  group by u.id
+  order by max(v.last_seen) desc nulls last;
+$$;
+revoke execute on function public.admin_user_stats() from public, anon;
+grant execute on function public.admin_user_stats() to authenticated;

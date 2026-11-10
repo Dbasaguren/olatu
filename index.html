@@ -260,6 +260,18 @@ table.fc tr.hour td.hcell:hover{color:var(--accent)}
 .sw-pop{position:absolute;z-index:900;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;box-shadow:0 6px 20px rgba(0,0,0,.18);font:500 13px/1.5 var(--f-data);min-width:220px}
 .sw-pop b{display:block;font:700 13px var(--f-ui);margin-bottom:3px}
 .sw-pop span{display:inline-block;width:82px;color:var(--muted)}
+/* Écran de connexion */
+.gate{position:fixed;inset:0;z-index:1000;background:var(--bg);display:grid;place-items:center;padding:20px;overflow:auto}
+.gate-card{width:min(420px,100%);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px 22px;display:grid;gap:12px}
+.gate-card h2{margin:0;font:700 30px var(--f-ui)} .gate-card h2 span{color:var(--accent)}
+.gate-card p{margin:0;color:var(--muted);font-size:14px}
+.gl{display:grid;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.gl input{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line-strong);border-radius:6px;padding:9px 10px}
+.gate-note{font-size:12px!important}
+/* Administration : utilisateurs */
+.adm-users{width:100%;border-collapse:collapse;font:500 12.5px var(--f-data);margin-top:8px}
+.adm-users th,.adm-users td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left}
+.adm-users th{color:var(--muted);font-weight:600}
 /* Bichomètre */
 .bicho-open{font-size:18px;text-decoration:none;opacity:.35}
 .bicho-open:hover{opacity:1}
@@ -428,13 +440,15 @@ td.bicho .bnorm{color:var(--muted)}
         <div class="acc-btns"><button class="btn" type="button" id="accLogout">Se déconnecter</button><button class="btn danger" type="button" id="accDelete">Supprimer mon compte</button></div>
       </div>
       <p class="fmsg" id="accMsg" role="status"></p>
-      <p class="pd-hint">Avec un compte, tes réglages et tes sessions te suivent sur tous tes appareils. Personne d'autre ne peut les voir. La date de ta dernière visite est enregistrée.</p>
+      <p class="pd-hint">Avec un compte, tes réglages et tes sessions te suivent sur tous tes appareils. Personne d'autre ne peut les voir. Tes visites (date, durée, type d'appareil) sont enregistrées pour améliorer l'appli, visibles seulement par l'administrateur.</p>
     </section>
     <section class="pd-sec" id="adminSec" hidden>
       <h3>Administration</h3>
       <label class="chk"><input type="checkbox" id="admBicho"> Bichomètre activé pour tout le monde</label>
       <p class="fmsg" id="admMsg" role="status"></p>
       <p class="pd-hint">Visible uniquement par toi. S'applique à tous les utilisateurs à leur prochaine ouverture d'Olatuak.</p>
+      <div class="acc-btns"><button class="btn" type="button" id="admUsersBtn">Voir les utilisateurs</button></div>
+      <div id="admUsers" style="overflow-x:auto"></div>
     </section>
     <section class="pd-sec" id="profSec">
       <h3>Profil sans compte</h3>
@@ -457,6 +471,20 @@ td.bicho .bnorm{color:var(--muted)}
   </div>
   <div class="pd-foot"><button class="btn danger" type="button" id="delProf">Supprimer ce profil</button><button class="btn" type="button" id="resetProf">Tout réafficher</button></div>
 </dialog>
+
+<div class="gate" id="gate" hidden>
+  <div class="gate-card">
+    <h2>Olatuak<span>.</span></h2>
+    <p>Prévisions surf de la côte basque. Connecte-toi ou crée ton compte gratuit pour y accéder. Tu restes connecté tant que tu ne te déconnectes pas.</p>
+    <form id="gateForm" class="sform">
+      <label class="gl">Email<input type="email" id="gEmail" autocomplete="email" required></label>
+      <label class="gl">Mot de passe (8 caractères min.)<input type="password" id="gPass" autocomplete="current-password" minlength="8" required></label>
+      <div class="acc-btns"><button class="btn primary" type="submit">Se connecter</button><button class="btn" type="button" id="gSignup">Créer un compte</button></div>
+      <p class="fmsg" id="gMsg" role="status"></p>
+    </form>
+    <p class="gate-note">En utilisant Olatuak avec un compte, tu acceptes que tes visites (date, durée, type d'appareil) soient enregistrées pour améliorer l'appli. Elles ne sont visibles que par l'administrateur et ne sont jamais partagées. Tu peux supprimer ton compte et ces données à tout moment dans Personnaliser → Compte.</p>
+  </div>
+</div>
 
 <dialog class="bicho-dlg" id="bichoDlg" aria-labelledby="bkTitle">
   <div class="bk-head"><h2 id="bkTitle">Bichomètre <small>mode terrain</small></h2><button class="btn" type="button" data-close>Fermer</button></div>
@@ -1730,6 +1758,54 @@ document.getElementById("accDelete").addEventListener("click", async e=>{
   await sb.auth.signOut(); leaveAccount(); accMsg("Compte supprimé.");
 });
 loadAppConfig();
+
+// ---------- Écran de connexion + suivi des visites (comptes uniquement, transparent pour l'utilisateur) ----------
+const gate = document.getElementById("gate");
+function gMsg(t, err){ const m = document.getElementById("gMsg"); m.textContent = t || ""; m.className = "fmsg" + (err ? " err" : ""); }
+const gCred = () => ({email:document.getElementById("gEmail").value.trim(), password:document.getElementById("gPass").value});
+document.getElementById("gateForm").addEventListener("submit", async e=>{
+  e.preventDefault(); gMsg("Connexion…");
+  const {error} = await sb.auth.signInWithPassword(gCred());
+  if(error) return gMsg(frErr(error), true);
+  gMsg("");
+});
+document.getElementById("gSignup").addEventListener("click", async ()=>{
+  const c = gCred();
+  if(!c.email || c.password.length < 8) return gMsg("Indique ton email et un mot de passe d'au moins 8 caractères.", true);
+  gMsg("Création du compte…");
+  const {data, error} = await sb.auth.signUp({...c, options:{emailRedirectTo: location.origin + location.pathname}});
+  if(error) return gMsg(frErr(error), true);
+  gMsg(data.session ? "" : "Compte créé. Confirme ton email puis connecte-toi.");
+});
+
+const VISIT = {id:null, ms:0, since:null, timer:null};
+const deviceName = () => { const u = navigator.userAgent; return /iPhone|iPad/.test(u) ? "iPhone/iPad" : /Android/.test(u) ? "Android" : /Mac/.test(u) ? "Mac" : /Windows/.test(u) ? "PC Windows" : "Autre"; };
+function visitTick(){   // cumule le temps passé appli visible à l'écran
+  if(VISIT.since){ VISIT.ms += Date.now() - VISIT.since; VISIT.since = document.hidden ? null : Date.now(); }
+  else if(!document.hidden) VISIT.since = Date.now();
+}
+function visitSave(){
+  visitTick();
+  if(!VISIT.id || !account) return;
+  sb.from("visits").update({last_seen:new Date().toISOString(), seconds:Math.round(VISIT.ms/1000)}).eq("id", VISIT.id).then(({error})=>{ if(error) console.warn("Visite non enregistrée :", error.message); });
+}
+async function visitStart(){
+  if(VISIT.id || !sb) return;
+  const {data, error} = await sb.from("visits").insert({device:deviceName()}).select("id").single();
+  if(error){ console.warn("Visite non enregistrée :", error.message); return; }
+  VISIT.id = data.id; VISIT.ms = 0; VISIT.since = document.hidden ? null : Date.now();
+  VISIT.timer = setInterval(visitSave, 30000);
+}
+document.addEventListener("visibilitychange", visitSave);
+window.addEventListener("pagehide", visitSave);
+
+document.getElementById("admUsersBtn").addEventListener("click", async ()=>{
+  const box = document.getElementById("admUsers"); box.textContent = "Chargement…";
+  const {data, error} = await sb.rpc("admin_user_stats");
+  if(error){ box.textContent = "Impossible de charger : " + frErr(error); return; }
+  const d = v => v ? new Date(v).toLocaleString("fr-FR", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}) : "–";
+  box.innerHTML = `<p class="pd-hint">${data.length} compte${data.length>1?"s":""}</p><table class="adm-users"><tr><th>Email</th><th>Créé le</th><th>Dernière visite</th><th>Visites</th><th>Temps total</th><th>Appareil</th></tr>${data.map(r=>`<tr><td>${esc(r.email)}</td><td>${d(r.created_at)}</td><td>${d(r.last_visit)}</td><td>${r.visits}</td><td>${r.minutes} min</td><td>${esc(r.device||"–")}</td></tr>`).join("")}</table>`;
+});
 if(sb){
   sb.auth.onAuthStateChange((event, session)=>{
     // Hors du callback : la bibliothèque déconseille d'appeler Supabase directement dedans
@@ -1738,6 +1814,8 @@ if(sb){
       if(event==="PASSWORD_RECOVERY"){ document.getElementById("accNewPass").hidden = false; openPrefs(); accMsg("Choisis ton nouveau mot de passe."); }
       if(u && (!account || account.id!==u.id || !account.ready)) useAccount(u);
       else if(!u && account) leaveAccount();
+      gate.hidden = !!u;   // pas de compte connecté : écran de connexion
+      if(u) visitStart(); else { clearInterval(VISIT.timer); VISIT.id = null; }
       renderAccount(); renderWho();
     }, 0);
   });
