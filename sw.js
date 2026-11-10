@@ -1,6 +1,6 @@
 // Service worker d'Olatuak : l'appli s'ouvre même sans réseau, avec les dernières prévisions téléchargées.
 // Changer VERSION à chaque mise en ligne pour forcer la mise à jour du cache.
-const VERSION = "olatu-v34";
+const VERSION = "olatu-v35";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon.png"];
 
 self.addEventListener("install", e => {

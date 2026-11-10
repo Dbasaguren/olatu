@@ -272,6 +272,9 @@ table.fc tr.hour td.hcell:hover{color:var(--accent)}
 .adm-users{width:100%;border-collapse:collapse;font:500 12.5px var(--f-data);margin-top:8px}
 .adm-users th,.adm-users td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left}
 .adm-users th{color:var(--muted);font-weight:600}
+/* Bonnes directions */
+.dirgrid{display:grid;grid-template-columns:auto auto auto auto;gap:6px 8px;align-items:center;justify-content:start;font-size:14px}
+.dirgrid input{width:64px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line-strong);border-radius:6px;padding:5px 6px}
 /* Bichomètre */
 .bicho-open{font-size:18px;text-decoration:none;opacity:.35}
 .bicho-open:hover{opacity:1}
@@ -455,6 +458,15 @@ td.bicho .bnorm{color:var(--muted)}
       <div class="profiles" id="profList"></div>
       <form class="newp" id="newProf"><input id="newName" maxlength="20" placeholder="Nom d'un nouveau profil" aria-label="Nom du nouveau profil"><button class="btn" type="submit">Créer</button></form>
       <p class="pd-hint">Sans compte, chaque profil garde ses réglages et ses sessions dans ce navigateur uniquement.</p>
+    </section>
+    <section class="pd-sec">
+      <h3 id="dirTitle">Bonnes directions</h3>
+      <div class="dirgrid">
+        <span>Houle venant de</span><label><input type="number" id="dSw0" min="0" max="359" inputmode="numeric" aria-label="Houle : de (degrés)">°</label><span>à</span><label><input type="number" id="dSw1" min="0" max="359" inputmode="numeric" aria-label="Houle : à (degrés)">°</label>
+        <span>Vent venant de</span><label><input type="number" id="dWi0" min="0" max="359" inputmode="numeric" aria-label="Vent : de (degrés)">°</label><span>à</span><label><input type="number" id="dWi1" min="0" max="359" inputmode="numeric" aria-label="Vent : à (degrés)">°</label>
+      </div>
+      <div class="acc-btns"><button class="btn" type="button" id="dirReset">Valeurs par défaut</button></div>
+      <p class="pd-hint">Pour le spot affiché. Sens des aiguilles d'une montre : 0° = nord, 90° = est, 180° = sud, 270° = ouest. Ex. houle 280° à 320° = ouest-nord-ouest à nord-ouest. Ces plages colorent les lignes Direction et comptent dans la note.</p>
     </section>
     <section class="pd-sec">
       <h3>Lignes du tableau</h3>
@@ -768,9 +780,19 @@ function rowStyles(cols, vals, colorFn){
 }
 
 // ---------- Relation vent / plage ----------
-function windRel(dir, face){
-  const d = Math.abs(((dir - face)%360+540)%360-180); // 0 = vent venant de la mer
-  return d<=45 ? "on" : d>=135 ? "off" : "cross";
+// Plages « bonne direction » (degrés, sens horaire de a à b) : réglage perso par spot, sinon par défaut
+const norm = d => ((Math.round(d)%360)+360)%360;
+function defaultDirs(spot){
+  const [best, win] = SWELL[spot.id] || [spot.face], g = (win || [20])[0];
+  return {sw:[norm(best-g), norm(best+g)], wi:[norm(spot.face+135), norm(spot.face+225)]};
+}
+const spotDirs = spot => ({...defaultDirs(spot), ...((state.dirs||{})[spot.id] || {})});
+const inArc = (d, [a,b]) => (d-a+360)%360 <= (b-a+360)%360;
+const arcGap = (d, arc) => inArc(d, arc) ? 0 : Math.min(angDiff(d, arc[0]), angDiff(d, arc[1]));
+const arcMid = ([a,b]) => norm(a + ((b-a+360)%360)/2);
+function windRel(dir, spot){
+  if(inArc(dir, spotDirs(spot).wi)) return "off";   // dans ta plage de bon vent
+  return angDiff(dir, spot.face)<=45 ? "on" : "cross"; // 0 = vent venant de la mer
 }
 const REL_TXT = {off:"offshore", cross:"side-shore", on:"onshore"};
 // Direction de houle idéale par spot (provenance, en degrés) et tolérance [bonne, moyenne].
@@ -801,9 +823,8 @@ const SWELL = {
   deuxjumeaux:[320,[15,35]], hendaye:[320,[15,35]],
 };
 function swellFit(dir, spot){
-  const [best, win] = SWELL[spot.id] || [spot.face], [good, ok] = win || [20, 45];
-  const d = angDiff(dir, best);
-  return {cls: d<=good ? "sw-good" : d<=ok ? "sw-ok" : "sw-bad", txt: d<=good ? "bonne direction" : d<=ok ? "direction moyenne" : "mauvaise direction", best};
+  const arc = spotDirs(spot).sw, d = arcGap(dir, arc);
+  return {cls: d===0 ? "sw-good" : d<=25 ? "sw-ok" : "sw-bad", txt: d===0 ? "bonne direction" : d<=25 ? "direction moyenne" : "mauvaise direction", best:arcMid(arc), arc};
 }
 
 // ---------- Note /10 ----------
@@ -815,7 +836,7 @@ function windComp(ws, wdir, face){ const r = (((wdir-face)%360+540)%360-180)*DEG
 function feat(hs, per, dir, ws, wdir, tide, rising, spot){
   if(hs==null || per==null) return null;
   const w = ws!=null && wdir!=null ? windComp(ws, wdir, spot.face) : {on:0, side:0};
-  return {hs, per, dir, ws, on:w.on, side:w.side, tide, rising, e:ENERGY(hs, per)};
+  return {hs, per, dir, ws, wdir, on:w.on, side:w.side, tide, rising, e:ENERGY(hs, per)};
 }
 // Note de base, avant tes sessions : énergie de la houle, période et vent par rapport à la plage
 function baseScore(f, spot){
@@ -824,7 +845,9 @@ function baseScore(f, spot){
   if(f.hs>3.5 && !spot.big) s = Math.min(s, 6);
   if(spot.big && f.hs<4) s = Math.min(s, 2);
   if(f.per<8) s -= 2; else if(f.per<10) s -= 1;
-  if(f.ws!=null){
+  if(f.dir!=null){ const g = arcGap(f.dir, spotDirs(spot).sw); if(g>25) s -= 2; else if(g>0) s -= 1; }
+  const goodWind = f.wdir!=null && inArc(f.wdir, spotDirs(spot).wi);
+  if(f.ws!=null && !goodWind){
     if(f.on>0) s -= Math.min(5, 0.25*Math.max(0, f.on-4));
     s -= Math.min(3, 0.12*Math.max(0, f.side-8));
     if(-f.on>20) s -= 0.15*(-f.on-20);
@@ -946,7 +969,7 @@ function render(spot, data){
     const parts = [c.s1, c.s2, c.ww].filter(x=>x && x.h > 0 && x.p > 0);
     c.e = parts.length ? parts.reduce((a, x)=>a + ENERGY(x.h, x.p), 0) : H_!=null && c.per!=null ? ENERGY(H_, c.per) : null;
     c.ws = best("ws",c.t); c.wg = best("wg",c.t); c.wdir = best("wd",c.t);
-    c.rel = c.wdir!=null ? windRel(c.wdir, spot.face) : null;
+    c.rel = c.wdir!=null ? windRel(c.wdir, spot) : null;
     c.sst = sst.get(c.t);
   });
 
@@ -1047,7 +1070,7 @@ function render(spot, data){
     dirhoule: `${lab("Direction","selon le spot")}${cols.map(c=>{
       if(c.dir==null) return td(c, "–", "dim");
       const fit = swellFit(c.dir, spot);
-      return td(c, arrow(c.dir, `Houle de ${card(c.dir)} (${Math.round(c.dir)}°), ${fit.txt} pour ce spot (idéale : ${card(fit.best)}, ${fit.best}°)`), "dirc "+fit.cls);
+      return td(c, arrow(c.dir, `Houle de ${card(c.dir)} (${Math.round(c.dir)}°), ${fit.txt} pour ce spot (bonne de ${fit.arc[0]}° à ${fit.arc[1]}°)`), "dirc "+fit.cls);
     }).join("")}`,
     energie:  `${lab("Énergie","kJ")}${cRow("energy", c=>c.e, fmt)}`,
     vent:     `${lab("Vent","nœuds")}${cRow("wind", c=>c.ws, fmt)}`,
@@ -1084,7 +1107,7 @@ function render(spot, data){
   <div class="scroll"><table class="fc" style="width:${tblW}px">${colgroup}<thead>${header()}</thead><tbody>
     <tr>${lab("Vent","nœuds")}${cRow("wind", c=>X.ws.get(c.t), fmt)}</tr>
     <tr>${lab("Rafales","nœuds")}${cRow("wind", c=>X.wg.get(c.t), fmt)}</tr>
-    <tr>${lab("Direction")}${cols.map(c=>{const v=X.wd.get(c.t); const r=v==null?"":windRel(v,spot.face); return td(c, arrow(v, v==null?"":`Vent de ${card(v)} (${Math.round(v)}°), ${REL_TXT[r]}`), "dirc "+r);}).join("")}</tr>
+    <tr>${lab("Direction")}${cols.map(c=>{const v=X.wd.get(c.t); const r=v==null?"":windRel(v,spot); return td(c, arrow(v, v==null?"":`Vent de ${card(v)} (${Math.round(v)}°), ${REL_TXT[r]}`), "dirc "+r);}).join("")}</tr>
   </tbody></table></div></details>`;
   }).join("");
 
@@ -1093,14 +1116,14 @@ function render(spot, data){
   if(state.view === "hist") document.querySelectorAll("#out .scroll").forEach(e=>{ e.scrollLeft = e.scrollWidth; });   // historique : on arrive sur les jours récents
 
   // En-tête du spot
-  const offDir = (spot.face+180)%360;
+  const myDirs = spotDirs(spot);
   const todayCoef = coefs[todayKey] || [];
   const nowCol = cols[0];
   const nextPM = ex.find(e=>e.type==="PM" && e.t>nowNaive()), nextBM = ex.find(e=>e.type==="BM" && e.t>nowNaive());
   document.getElementById("spotName").textContent = `${spot.town} · ${spot.name}`;
   document.getElementById("spotMeta").innerHTML = [
     `Face au <b>${card(spot.face)}</b> (${spot.face}°)`,
-    `Offshore par vent de <b>${card(offDir)}</b>`,
+    `Bon vent <b>${myDirs.wi[0]}°–${myDirs.wi[1]}°</b> · bonne houle <b>${myDirs.sw[0]}°–${myDirs.sw[1]}°</b>`,
     todayCoef.length ? `Coef du jour <b>${todayCoef.join(" / ")}</b>` : "",
     cols.sun[todayKey] ? `Soleil <b>${hhmm(cols.sun[todayKey][0])}</b> – <b>${hhmm(cols.sun[todayKey][1])}</b>` : "",
     nextPM ? `Prochaine PM <b>${hhmm(nextPM.t)}</b>` : "",
@@ -1219,6 +1242,9 @@ function renderPrefs(){
   document.getElementById("delProf").hidden = !!account;
   renderAccount();
   syncSeg("segTheme", state.theme || "auto");
+  const sp = SPOTS.find(x=>x.id===state.spot), dd = spotDirs(sp);
+  document.getElementById("dirTitle").textContent = `Bonnes directions · ${sp.name}`;
+  [["dSw0",dd.sw[0]],["dSw1",dd.sw[1]],["dWi0",dd.wi[0]],["dWi1",dd.wi[1]]].forEach(([id,v])=>document.getElementById(id).value = v);
 }
 function applyTheme(){
   const t = state.theme || "auto", root = document.documentElement;
@@ -1245,6 +1271,12 @@ dlg.addEventListener("change", e=>{
   const i = e.target;
   if(i.dataset.row){ state.hidden = state.hidden.filter(x=>x!==i.dataset.row); if(!i.checked) state.hidden.push(i.dataset.row); }
   else if(i.dataset.blk){ state.blocks[i.dataset.blk] = i.checked; }
+  else if(/^d(Sw|Wi)[01]$/.test(i.id)){
+    const v = id => { const n = parseFloat(document.getElementById(id).value); return Number.isFinite(n) ? norm(n) : null; };
+    const sw = [v("dSw0"), v("dSw1")], wi = [v("dWi0"), v("dWi1")];
+    if([...sw, ...wi].includes(null)) return;   // champ vide : on attend une valeur
+    state.dirs = {...(state.dirs||{}), [state.spot]: {sw, wi}};
+  }
   else return;
   prefsDirty = true; applyAll();
 });
@@ -1258,6 +1290,10 @@ document.getElementById("newProf").addEventListener("submit", e=>{
 document.getElementById("delProf").addEventListener("click", ()=>{
   if(Object.keys(store.users).length<2) return;
   delete store.users[store.current]; useProfile(Object.keys(store.users)[0]); renderPrefs(); applyAll();
+});
+document.getElementById("dirReset").addEventListener("click", ()=>{
+  if(state.dirs) delete state.dirs[state.spot];
+  renderPrefs(); prefsDirty = true; applyAll();
 });
 document.getElementById("resetProf").addEventListener("click", ()=>{
   state.hidden = []; BLOCKS.forEach(([id])=>state.blocks[id] = true); renderPrefs(); applyAll();
