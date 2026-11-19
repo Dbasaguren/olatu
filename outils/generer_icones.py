@@ -2,7 +2,7 @@
 import sys, os
 from PIL import Image, ImageDraw
 
-OUT = sys.argv[1] if len(sys.argv) > 1 else "icons"
+OUT = sys.argv[1] if len(sys.argv) > 1 else "public/icons"
 os.makedirs(OUT, exist_ok=True)
 BG = (11, 110, 122)
 FOAM = (255, 255, 255)

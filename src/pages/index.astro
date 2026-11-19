@@ -1,0 +1,17 @@
+---
+import Base from "../layouts/Base.astro";
+import AppBody from "../components/AppBody.astro";
+import SpotLinks from "../components/SpotLinks.astro";
+import { SPOTS } from "../lib/spots.js";
+---
+<Base
+  title="Olatuak · Prévisions surf Côte basque et Landes"
+  description="Olatuak : prévisions surf gratuites de la côte basque et des Landes, de Biscarrosse à Hendaye. Houle, période, énergie, vent offshore, marée de Socoa et coefficient, carte de la houle sur le monde entier."
+  ogTitle="Olatuak · Prévisions surf Côte basque"
+  ogDescription={`Houle, vent, marée et coefficient pour ${SPOTS.length} spots, de Biscarrosse à Hendaye. Gratuit, installable sur téléphone.`}
+  path="/"
+>
+  <AppBody>
+    <SpotLinks />
+  </AppBody>
+</Base>

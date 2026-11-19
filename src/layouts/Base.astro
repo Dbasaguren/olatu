@@ -1,0 +1,51 @@
+---
+// En-tête commun : référencement (titre, description, aperçu de lien), PWA, polices et styles.
+import "../styles/app.css";
+
+interface Props {
+  title: string;
+  description: string;
+  path: string;            // chemin canonique, ex. "/" ou "/spots/cenitz/"
+  ogTitle?: string;
+  ogDescription?: string;
+  spot?: string;           // id du spot imposé à l'ouverture (pages de spot)
+}
+const { title, description, path, ogTitle = title, ogDescription = description, spot } = Astro.props;
+const url = new URL(path, Astro.site).href;
+---
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{title}</title>
+<meta name="description" content={description}>
+<link rel="canonical" href={url}>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Olatuak">
+<meta property="og:title" content={ogTitle}>
+<meta property="og:description" content={ogDescription}>
+<meta property="og:url" content={url}>
+<meta property="og:image" content="https://olatuak.eu/icons/icon-512.png">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#0b6e7a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/icons/favicon.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Olatuak">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
+<slot name="head" />
+</head>
+<body data-spot={spot}>
+<slot />
+<script>
+  import "../scripts/app.js";
+</script>
+</body>
+</html>
