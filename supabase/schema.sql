@@ -117,3 +117,74 @@ as $$
 $$;
 revoke execute on function public.admin_user_stats() from public, anon;
 grant execute on function public.admin_user_stats() to authenticated;
+
+-- Ajout 2026-11 : compte facultatif, visites anonymes comptées aussi.
+-- Chaque navigateur a un identifiant tiré au hasard (visitor). Le serveur note l'adresse IP
+-- tronquée (dernier bloc effacé : 81.250.12.0) et le pays si disponible. Visites gardées 13 mois.
+alter table public.visits alter column user_id drop not null;
+alter table public.visits add column if not exists visitor text;
+alter table public.visits add column if not exists ip text;
+alter table public.visits add column if not exists country text;
+create index if not exists visits_visitor_idx on public.visits(visitor);
+create index if not exists visits_last_seen_idx on public.visits(last_seen);
+
+create or replace function public.visit_start(p_visitor text, p_device text)
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  h json := coalesce(nullif(current_setting('request.headers', true), ''), '{}')::json;
+  raw text := trim(split_part(coalesce(h->>'cf-connecting-ip', h->>'x-forwarded-for', h->>'x-real-ip', ''), ',', 1));
+  tip text;
+  vid uuid;
+begin
+  if p_visitor is null or char_length(p_visitor) > 64 then raise exception 'visiteur invalide'; end if;
+  tip := case
+    when raw ~ '^\d+\.\d+\.\d+\.\d+$' then regexp_replace(raw, '\.\d+$', '.0')
+    when raw like '%:%' then array_to_string((string_to_array(raw, ':'))[1:3], ':') || '::'
+    else null end;
+  delete from public.visits where last_seen < now() - interval '13 months';
+  insert into public.visits (user_id, visitor, device, ip, country)
+  values (auth.uid(), p_visitor, left(p_device, 40), tip, left(h->>'cf-ipcountry', 2))
+  returning id into vid;
+  return vid;
+end;
+$$;
+
+create or replace function public.visit_ping(p_id uuid, p_seconds integer)
+returns void
+language sql security definer set search_path = ''
+as $$
+  update public.visits
+     set last_seen = now(),
+         seconds = least(greatest(coalesce(p_seconds, 0), 0), 86400),
+         user_id = coalesce(user_id, auth.uid())
+   where id = p_id and (user_id is null or user_id = auth.uid());
+$$;
+
+revoke execute on function public.visit_start(text, text), public.visit_ping(uuid, integer) from public;
+grant execute on function public.visit_start(text, text), public.visit_ping(uuid, integer) to anon, authenticated;
+
+create or replace function public.admin_visitor_stats()
+returns table(visitor text, email text, first_visit timestamptz, last_visit timestamptz, visits bigint, minutes numeric, device text, ip text, country text)
+language sql security definer set search_path = ''
+as $$
+  with g as (
+    select coalesce(v.visitor, v.user_id::text) as visitor,
+           (array_agg(v.user_id order by v.last_seen desc) filter (where v.user_id is not null))[1] as uid,
+           min(v.started_at) as first_visit, max(v.last_seen) as last_visit, count(*) as visits,
+           round(sum(v.seconds) / 60.0, 1) as minutes,
+           (array_agg(v.device order by v.last_seen desc))[1] as device,
+           (array_agg(v.ip order by v.last_seen desc) filter (where v.ip is not null))[1] as ip,
+           (array_agg(v.country order by v.last_seen desc) filter (where v.country is not null))[1] as country
+    from public.visits v
+    where exists (select 1 from public.admins a where a.user_id = auth.uid())
+    group by 1
+  )
+  select g.visitor, u.email::text, g.first_visit, g.last_visit, g.visits, g.minutes, g.device, g.ip, g.country
+  from g left join auth.users u on u.id = g.uid
+  order by g.last_visit desc
+  limit 1000;
+$$;
+revoke execute on function public.admin_visitor_stats() from public, anon;
+grant execute on function public.admin_visitor_stats() to authenticated;
