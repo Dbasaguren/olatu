@@ -1,0 +1,52 @@
+---
+// Une page par spot (/spots/<id>/) : même appli, ouverte sur ce spot, avec un titre et un texte propres
+// pour que Google puisse la proposer (« surf Côte des Basques », « prévisions Cenitz »…).
+import Base from "../../layouts/Base.astro";
+import AppBody from "../../components/AppBody.astro";
+import SpotLinks from "../../components/SpotLinks.astro";
+import { SPOTS, CAMS } from "../../lib/spots.js";
+import { spotLabel, spotTitle, spotDescription, spotPath, spotFacts } from "../../lib/spot-info.js";
+
+export function getStaticPaths() {
+  return SPOTS.map(spot => ({ params: { id: spot.id }, props: { spot } }));
+}
+const { spot } = Astro.props;
+const f = spotFacts(spot);
+const cam = CAMS[spot.id];
+const ld = {
+  "@context": "https://schema.org",
+  "@type": "Beach",
+  name: spotLabel(spot),
+  url: new URL(spotPath(spot), Astro.site).href,
+  geo: { "@type": "GeoCoordinates", latitude: spot.lat, longitude: spot.lon },
+  address: { "@type": "PostalAddress", addressLocality: spot.town, addressCountry: "FR" },
+};
+---
+<Base
+  title={spotTitle(spot)}
+  description={spotDescription(spot)}
+  ogTitle={`Surf ${spotLabel(spot)} · Olatuak`}
+  path={spotPath(spot)}
+  spot={spot.id}
+>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(ld)} />
+  <AppBody spotTitle={`${spot.town} · ${spot.name}`}>
+    <section class="spot-about">
+      <h2>Surf {spotLabel(spot)}</h2>
+      <p>
+        {spot.name} est un spot de {spot.town} ({f.region}). La plage est tournée vers {f.faces}.
+        Elle marche le mieux avec une houle {f.swell} et un vent de terre (offshore) {f.wind}.
+        {spot.reef && " Le fond est fait de roche ou de récif."}
+        {spot.big && " C'est une vague de gros, qui ne se réveille qu'à partir de 4 m de houle environ."}
+      </p>
+      <p>
+        Olatuak calcule pour {spot.name} la hauteur, la période et l'énergie de la houle (modèle GFS-Wave),
+        le vent heure par heure (AROME, ICON, ECMWF, GFS), la marée et le coefficient, et une note sur 10
+        qui s'adapte à tes sessions.
+        {spot.region === "Landes" && " La marée affichée est celle de Socoa, à quelques minutes près."}
+        {cam && <> Webcam en direct : <a href={cam.url} target="_blank" rel="noopener">{cam.label}</a>.</>}
+      </p>
+    </section>
+    <SpotLinks current={spot.id} />
+  </AppBody>
+</Base>

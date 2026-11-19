@@ -1,0 +1,31 @@
+---
+// Liens vers la page de chaque spot, groupés par région puis par commune (navigation et référencement).
+import { SPOTS } from "../lib/spots.js";
+import { spotPath } from "../lib/spot-info.js";
+
+interface Props { current?: string }
+const { current } = Astro.props;
+const regions = new Map();
+for (const s of SPOTS) {
+  const r = s.region || "Pays basque";
+  if (!regions.has(r)) regions.set(r, new Map());
+  const towns = regions.get(r);
+  if (!towns.has(s.town)) towns.set(s.town, []);
+  towns.get(s.town).push(s);
+}
+---
+<nav class="spot-index" aria-label="Tous les spots">
+  <h2>Prévisions surf par spot</h2>
+  {[...regions].map(([region, towns]) => (
+    <div class="si-region">
+      <h3>{region}</h3>
+      <ul>
+        {[...towns].map(([town, list]) => (
+          <li><b>{town}</b> : {list.map((s, i) => (
+            <>{i > 0 && " · "}{s.id === current ? <span aria-current="page">{s.name}</span> : <a href={spotPath(s)}>{s.name}</a>}</>
+          ))}</li>
+        ))}
+      </ul>
+    </div>
+  ))}
+</nav>

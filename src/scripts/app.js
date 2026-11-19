@@ -1,605 +1,13 @@
-<!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Olatuak</title>
-<meta name="description" content="Olatuak : prévisions surf gratuites de la côte basque et des Landes, de Biscarrosse à Hendaye. Houle, période, énergie, vent offshore, marée de Socoa et coefficient, carte de la houle sur le monde entier.">
-<link rel="canonical" href="https://olatuak.eu/">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="Olatuak">
-<meta property="og:title" content="Olatuak · Prévisions surf Côte basque">
-<meta property="og:description" content="Houle, vent, marée et coefficient pour 28 spots, de Biscarrosse à Hendaye. Gratuit, installable sur téléphone.">
-<meta property="og:url" content="https://olatuak.eu/">
-<meta property="og:image" content="https://olatuak.eu/icons/icon-512.png">
-<meta property="og:locale" content="fr_FR">
-<meta name="twitter:card" content="summary">
-<meta name="theme-color" content="#0b6e7a">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" href="icons/favicon.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Olatuak">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap">
-<style>
-/* Layout: barre de spots en haut, puis un grand tableau horaire façon Windguru (une colonne par créneau, une ligne par paramètre), blocs modèles repliables dessous. */
-:root{
-  --bg:#eef2f4; --surface:#ffffff; --ink:#122433; --muted:#5d6f7c; --line:#d5dde2; --line-strong:#9fb0bb;
-  --accent:#0b6e7a; --accent-soft:#d9eef0; --night:rgba(18,36,51,.06); --today:#0b6e7a;
-  --off:#cfeedd; --cross:#f3ecd2; --on:#f6d4cf; --off-ink:#1d6b45; --on-ink:#9a3226;
-  --tide-fill:rgba(11,110,122,.16); --tide-line:#0b6e7a; --star:#e0a100;
-  --g-surf:#c98f00; --g-houle:#5f66d9; --g-vent:#169a50; --g-maree:#0b6e7a; --g-fun:#d14d8b; --grp-bg:#f5f8fa;
-  --f-ui:"Barlow",system-ui,"Segoe UI",sans-serif; --f-data:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
-  color-scheme:light;
-}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --g-surf:#f2c14e; --g-houle:#9ea4ff; --g-vent:#5fd38f; --g-maree:#4fc1cc; --g-fun:#f28cbc; --grp-bg:#0f1a22;
-  --bg:#0c161e; --surface:#121f29; --ink:#e3ecf1; --muted:#8fa3b1; --line:#22343f; --line-strong:#3d5463;
-  --accent:#4fc1cc; --accent-soft:#163a40; --night:rgba(0,0,0,.28); --today:#4fc1cc;
-  --off:#2f7a52; --cross:#6b5d2a; --on:#8a3a30; --off-ink:#e6fff1; --on-ink:#ffe3de;
-  --tide-fill:rgba(79,193,204,.18); --tide-line:#4fc1cc; --star:#f2c14e; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --g-surf:#f2c14e; --g-houle:#9ea4ff; --g-vent:#5fd38f; --g-maree:#4fc1cc; --g-fun:#f28cbc; --grp-bg:#0f1a22;
-  --bg:#0c161e; --surface:#121f29; --ink:#e3ecf1; --muted:#8fa3b1; --line:#22343f; --line-strong:#3d5463;
-  --accent:#4fc1cc; --accent-soft:#163a40; --night:rgba(0,0,0,.28); --today:#4fc1cc;
-  --off:#2f7a52; --cross:#6b5d2a; --on:#8a3a30; --off-ink:#e6fff1; --on-ink:#ffe3de;
-  --tide-fill:rgba(79,193,204,.18); --tide-line:#4fc1cc; --star:#f2c14e; color-scheme:dark}
-*{box-sizing:border-box}
-[hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-ui)}
-.wrap{max-width:1500px;margin:0 auto;padding-inline:max(20px, env(safe-area-inset-left));padding-block:max(18px, env(safe-area-inset-top)) max(40px, env(safe-area-inset-bottom))}
-header.top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:space-between}
-.brand{display:flex;align-items:baseline;gap:12px}
-.brand h1{margin:0;font:700 28px/1 var(--f-ui);letter-spacing:-.01em}
-.brand h1 span{color:var(--accent)}
-.brand p{margin:0;color:var(--muted);font-size:14px}
-.status{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px;flex-wrap:wrap}
-.temps{display:flex;gap:6px}
-.temps:empty{display:none}
-.tchip{display:flex;align-items:baseline;gap:6px;padding:4px 11px;border-radius:8px;background:var(--surface);border:1px solid var(--line)}
-.tchip small{font:600 10.5px var(--f-ui);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.tchip b{font:700 19px/1 var(--f-data);color:var(--ink);font-variant-numeric:tabular-nums}
-.tchip.eau b{color:var(--g-maree)}
-button{font:inherit;color:inherit;cursor:pointer}
-.btn{border:1px solid var(--line-strong);background:var(--surface);border-radius:6px;padding:6px 12px;font-weight:600;font-size:13px}
-.btn:hover{border-color:var(--accent);color:var(--accent)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-
-.spots{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px}
-.spot{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px 11px;text-align:left;line-height:1.15}
-.spot small{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.spot b{font-weight:600;font-size:14px}
-.spot:hover{border-color:var(--line-strong)}
-.spot[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
-.spot[aria-pressed="true"] small{color:rgba(255,255,255,.8)}
-:root[data-theme="dark"] .spot[aria-pressed="true"],
-:root:not([data-theme="light"]) .spot[aria-pressed="true"]{color:var(--bg)}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .spot[aria-pressed="true"]{color:#fff}}
-
-.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-top:22px}
-.head h2{margin:0;font:700 24px/1.1 var(--f-ui);text-wrap:balance}
-.meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:6px;color:var(--muted);font-size:14px}
-.meta b{color:var(--ink);font-weight:600}
-.controls{display:flex;gap:14px;flex-wrap:wrap}
-.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;background:var(--surface)}
-.seg button{border:0;background:none;padding:5px 11px;font-size:13px;font-weight:600;color:var(--muted)}
-.seg button+button{border-left:1px solid var(--line)}
-.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink)}
-.seg-lab{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:3px}
-
-.block{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.block>summary,.block>.bt{list-style:none;display:flex;align-items:baseline;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);cursor:pointer}
-.block>.bt{cursor:default}
-.block>summary::-webkit-details-marker{display:none}
-.bt-name{font-weight:700;font-size:15px}
-.bt-info{color:var(--muted);font-size:13px}
-.block:not([open])>summary{border-bottom:0}
-.block>summary::before{content:"";width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);margin-right:2px;align-self:center;transition:transform .15s}
-.block[open]>summary::before{transform:rotate(45deg)}
-.scroll{overflow-x:auto;padding-bottom:14px}
-/* La barre de défilement horizontale se place dans cette marge au lieu de cacher la dernière ligne */
-
-table.fc{border-collapse:collapse;table-layout:fixed;font:500 13px/1 var(--f-data);font-variant-numeric:tabular-nums}
-table.fc th,table.fc td{padding:0;text-align:center;height:24px;border-bottom:1px solid var(--line)}
-table.fc th.lab{position:sticky;left:0;z-index:2;background:var(--surface);text-align:left;padding:0 10px;font:600 12px/1.1 var(--f-ui);white-space:nowrap;border-right:1px solid var(--line-strong)}
-table.fc th.lab small{display:block;font-weight:400;font-size:10.5px;color:var(--muted)}
-table.fc .ds{border-left:2px solid var(--line-strong)}
-table.fc tr.day th{height:auto;padding:6px 4px 5px;font:600 13px/1.15 var(--f-ui);background:var(--surface);border-bottom:0;text-align:left;padding-left:8px;white-space:nowrap;overflow:hidden}
-table.fc tr.day th.today{color:var(--today)}
-table.fc tr.day .sun{display:block;white-space:normal;font:500 11.5px/1.2 var(--f-data);color:var(--muted);margin-top:3px}
-table.fc tr.day .coef{display:block;white-space:normal;font:500 12.5px/1.2 var(--f-data);color:var(--muted);margin-top:4px}
-.pmh{font-weight:700;color:var(--ink);white-space:nowrap}
-.cf{display:inline-block;padding:1px 6px;border-radius:4px;font-size:15px;font-weight:700;color:var(--ink)}
-table.fc tr.hour td{color:var(--muted);font-size:12px;height:20px}
-table.fc td.n{background-image:linear-gradient(var(--night),var(--night))}
-table.fc tr.hour td.now{color:var(--today);font-weight:700}
-td .sub{display:block;font-size:10.5px;color:var(--muted);margin-top:1px}
-.arr{width:19px;height:19px;display:block;margin:auto;fill:currentColor;stroke:currentColor}
-td.dirc{cursor:pointer}
-td.dirc:hover{outline:1px solid var(--line-strong);outline-offset:-1px}
-.deg{display:block;font-weight:600;font-size:12.5px;line-height:1}
-.deg .sub{font-weight:500;font-size:9.5px;margin-top:1px}
-td.off,td.sw-good{background:var(--off);color:var(--off-ink)} td.cross,td.sw-ok{background:var(--cross)} td.on,td.sw-bad{background:var(--on);color:var(--on-ink)}
-td.tide{height:62px;vertical-align:top}
-td.tide svg{display:block}
-td.tide text{font:600 10px var(--f-data);fill:var(--ink)}
-td.tide text.h{font-weight:400;fill:var(--muted)}
-td.dim{color:var(--muted)}
-td.tt{height:auto;padding:5px 6px}
-td.tt{overflow:hidden}
-td.tt div{display:flex;flex-wrap:wrap;justify-content:space-around;gap:3px 10px}
-td.tt span{font-weight:600;white-space:nowrap}
-td.tt i{font-style:normal;font-size:9px;margin-right:3px;vertical-align:1px}
-td.tt .pm i{color:var(--tide-line)} td.tt .bm i{color:var(--muted)}
-td.tt em{font-style:normal;font-weight:400;color:var(--muted);margin-left:4px}
-tr.gap td,tr.gap th{height:6px;border-bottom:0;background:var(--surface)}
-
-.msg{padding:40px 14px;text-align:center;color:var(--muted)}
-.msg b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
-
-.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px 26px;margin-top:22px}
-.lg h3{margin:0 0 5px;font:600 12px var(--f-ui);text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
-.lg .sw{display:flex}
-.lg .sw span{flex:1;text-align:center;font:500 11.5px/22px var(--f-data);min-width:0}
-.lg .rel{display:flex;gap:6px;flex-wrap:wrap}
-.lg .rel span{padding:2px 8px;border-radius:3px;font:500 12px/18px var(--f-data)}
-.notes{margin-top:22px;color:var(--muted);font-size:13px;max-width:900px}
-.notes p{margin:0 0 6px}
-.notes b{color:var(--ink);font-weight:600}
-
-/* Groupes de lignes : en-tête + liseré de couleur */
-table.fc tr.grp th, table.fc tr.grp td{height:22px;background:var(--grp-bg);border-top:1px solid var(--line-strong);border-bottom:1px solid var(--line)}
-table.fc tr.grp th.lab{font:700 10.5px/1 var(--f-ui);text-transform:uppercase;letter-spacing:.12em;background:var(--grp-bg);color:var(--gc)}
-table.fc tr.grp:first-child th, table.fc tr.grp:first-child td{border-top:0}
-table.fc tr[class*="g-"] th.lab{box-shadow:inset 3px 0 0 var(--gc)}
-tr.g-surf{--gc:var(--g-surf)} tr.g-houle{--gc:var(--g-houle)} tr.g-vent{--gc:var(--g-vent)} tr.g-maree{--gc:var(--g-maree)} tr.g-fun{--gc:var(--g-fun)}
-table.fc tbody tr:not(.grp):hover td{box-shadow:inset 0 1px 0 var(--line-strong), inset 0 -1px 0 var(--line-strong)}
-
-/* Profil + panneau Personnaliser */
-.who{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-strong);background:var(--surface);border-radius:20px;padding:3px 12px 3px 3px;font-weight:600;font-size:13px}
-.who:hover{border-color:var(--accent)}
-.avatar{width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--surface);display:grid;place-items:center;font:700 12px var(--f-ui)}
-dialog.prefs{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0;width:min(620px, calc(100% - 32px));max-height:calc(100% - 48px)}
-dialog.prefs::backdrop{background:rgba(10,20,28,.45)}
-.pd-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
-.pd-head h2{margin:0;font:700 18px var(--f-ui)}
-.pd-body{padding:6px 18px 18px;display:grid;gap:14px}
-.pd-sec h3{margin:12px 0 8px;font:600 12px var(--f-ui);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.profiles{display:flex;flex-wrap:wrap;gap:6px}
-.profiles button{border:1px solid var(--line);background:var(--bg);border-radius:20px;padding:4px 12px;font-weight:600;font-size:13px}
-.profiles button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
-.newp{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
-.newp input{flex:1;min-width:140px;font:inherit;font-size:14px;padding:5px 9px;border:1px solid var(--line-strong);border-radius:6px;background:var(--bg);color:var(--ink)}
-.pd-hint{margin:6px 0 0;color:var(--muted);font-size:12.5px}
-.rowgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px 18px}
-.rg{border-left:3px solid var(--gc);padding-left:10px}
-.rg b{display:block;font:700 11px var(--f-ui);text-transform:uppercase;letter-spacing:.1em;color:var(--gc);margin-bottom:4px}
-.rg.g-surf{--gc:var(--g-surf)} .rg.g-houle{--gc:var(--g-houle)} .rg.g-vent{--gc:var(--g-vent)} .rg.g-maree{--gc:var(--g-maree)} .rg.g-fun{--gc:var(--g-fun)} .rg.g-blocs{--gc:var(--muted)}
-.chk{display:flex;align-items:center;gap:7px;font-size:14px;padding:2px 0;cursor:pointer}
-.chk input{accent-color:var(--accent);width:15px;height:15px;margin:0}
-.pd-foot{display:flex;justify-content:space-between;gap:8px;padding:12px 18px;border-top:1px solid var(--line)}
-.btn.danger:hover{border-color:var(--on-ink);color:var(--on-ink)}
-.btn:disabled{opacity:.45;cursor:default}
-
-/* Note /10 : rouge -> vert */
-td.note{font-weight:700;font-size:13.5px;position:relative}
-td.note.perso::after{content:"";position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--ink);opacity:.55}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
-.btn.primary:hover{color:var(--surface);filter:brightness(1.08)}
-.sess-bar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-.btn.cam{text-decoration:none;color:var(--ink);display:inline-flex;align-items:center}
-/* Sessions */
-.sform{display:grid;gap:12px}
-.frow{display:flex;gap:10px;flex-wrap:wrap}
-.frow label{display:grid;gap:3px;font-size:12px;color:var(--muted);font-weight:600;flex:1;min-width:110px}
-.frow select,.frow input,.frow textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line-strong);border-radius:6px;padding:6px 8px}
-.frow textarea{resize:vertical;min-height:52px}
-.rate{display:grid;grid-template-columns:repeat(11,1fr);gap:4px}
-.rate button{border:1px solid var(--line);border-radius:6px;padding:8px 0;font:700 14px var(--f-data);color:var(--ink)}
-.rate button[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:1px}
-.rate-lab{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:3px}
-.fmsg{font-size:13px;color:var(--muted);min-height:18px}
-.fmsg.err{color:var(--on-ink)}
-.slist{display:grid;gap:8px}
-.sitem{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
-.sitem .sn{display:grid;place-items:center;height:38px;border-radius:6px;font:700 17px var(--f-data);color:var(--ink)}
-.sitem b{display:block;font-size:14px}
-.sitem span{display:block;font-size:12.5px;color:var(--muted)}
-.sitem i{font-style:normal;display:block;font-size:12.5px;color:var(--ink);margin-top:2px}
-.sitem .del{border:0;background:none;color:var(--muted);font-size:12px;text-decoration:underline;padding:4px}
-.sitem .del:hover{color:var(--on-ink)}
-.sempty{color:var(--muted);font-size:13.5px;padding:6px 0}
-/* Espace entre la synthèse et les blocs détaillés */
-.block.synth{margin-bottom:36px}
-/* Onglets Prévisions / Carte */
-.viewtabs{display:flex;gap:4px;margin-top:18px;border-bottom:1px solid var(--line-strong);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-.viewtabs::-webkit-scrollbar{display:none}
-.viewtabs button{flex:0 0 auto;white-space:nowrap;border:0;background:none;padding:9px 16px;font-weight:700;font-size:15px;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
-.viewtabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
-#mapView{margin-top:14px}
-.map-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-bottom:10px}
-.map-ext{color:var(--muted);font-size:13px}
-.map-ext:hover{color:var(--accent)}
-.map-wrap{position:relative}
-.map-frame{height:max(440px, calc(100vh - 330px));border-radius:10px;overflow:hidden;background:#0b1622}
-#mapFrame.leaflet-container{background:#0b1622;font:inherit}
-.map-load{position:absolute;inset:0;display:grid;place-items:center;color:#cfe3ee;font-weight:600;background:rgba(11,22,34,.55);border-radius:10px;pointer-events:none}
-.map-legend{position:absolute;left:12px;bottom:12px;z-index:500;background:rgba(11,22,34,.82);color:#e3ecf1;border-radius:8px;padding:7px 10px 6px;font:500 11px var(--f-data);pointer-events:none;min-width:220px}
-.map-legend b{display:block;font:700 10.5px var(--f-ui);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;color:#9fb6c4}
-.map-legend .bar{height:9px;border-radius:5px}
-.map-legend .ticks{display:flex;justify-content:space-between;margin-top:3px;font-variant-numeric:tabular-nums}
-.map-time{display:flex;align-items:center;gap:12px;margin-top:10px}
-.map-time input{flex:1;accent-color:var(--accent)}
-.map-time .btn{width:44px;padding:7px 0;font-size:15px}
-.map-when{font:700 14px var(--f-data);min-width:96px;text-align:right;font-variant-numeric:tabular-nums}
-.leaflet-popup-content{font:500 13px/1.45 var(--f-ui);margin:9px 12px}
-.leaflet-popup-content b{font-size:15px}
-@media (max-width:640px){.map-frame,.map-load{margin-inline:-14px;border-radius:0}.map-frame{height:calc(100vh - 290px)}.map-legend{min-width:180px}}
-/* Onglet météo */
-#meteoView{margin-top:14px}
-.wx-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
-@media (max-width:1000px){.wx-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
-.wx{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:3px}
-.wx.today{border-color:var(--accent)}
-.wx-day{font:700 14px var(--f-ui)}
-.wx-ico{font-size:34px;line-height:1.1}
-.wx-lab{font-size:12.5px;color:var(--muted);min-height:2.4em}
-.wx-t{font:700 20px var(--f-data);font-variant-numeric:tabular-nums}
-.wx-t small{font-weight:500;color:var(--muted);font-size:15px}
-.wx-l{font:500 12.5px var(--f-data);color:var(--muted);font-variant-numeric:tabular-nums}
-.wx-l b{color:var(--ink);font-weight:600}
-.disp-btn{align-self:flex-end}
-/* Houle 1 / houle 2 */
-td.swc{cursor:pointer}
-table.fc tr.hour td.hcell{cursor:pointer}
-table.fc tr.hour td.hcell:hover{color:var(--accent)}
-.sw-pop{position:absolute;z-index:900;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:8px;padding:9px 12px;box-shadow:0 6px 20px rgba(0,0,0,.18);font:500 13px/1.5 var(--f-data);min-width:220px}
-.sw-pop b{display:block;font:700 13px var(--f-ui);margin-bottom:3px}
-.sw-pop span{display:inline-block;width:82px;color:var(--muted)}
-/* Administration : utilisateurs */
-.adm-users{width:100%;border-collapse:collapse;font:500 12.5px var(--f-data);margin-top:8px}
-.adm-users th,.adm-users td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left}
-.adm-users th{color:var(--muted);font-weight:600}
-/* Bonnes directions */
-.dirgrid{display:grid;grid-template-columns:auto auto auto auto;gap:6px 8px;align-items:center;justify-content:start;font-size:14px}
-.dirgrid input{width:64px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line-strong);border-radius:6px;padding:5px 6px}
-/* Créer ton spot */
-.ns-map{height:min(50vh,380px);border-radius:8px;border:1px solid var(--line);margin:8px 0 12px}
-.sp-del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:4px 6px;margin-left:auto}
-/* Bichomètre */
-.bicho-open{font-size:18px;text-decoration:none;opacity:.35}
-.bicho-open:hover{opacity:1}
-table.fc tr.g-fun td.bicho, table.fc tr.g-fun th.lab{cursor:pointer}
-dialog.bicho-dlg{border:0;padding:0;width:100%;max-width:100%;height:100%;max-height:100%;margin:0;background:#07131c;color:#e3ecf1}
-dialog.bicho-dlg::backdrop{background:#07131c}
-.bk-head{display:flex;justify-content:space-between;align-items:center;padding:max(14px,env(safe-area-inset-top)) 16px 10px}
-.bk-head h2{margin:0;font:700 20px var(--f-ui);color:#f28cbc}
-.bk-head small{font-weight:500;font-size:12px;color:#8fa3b1;margin-left:6px}
-.bicho-dlg .btn:not(.primary){background:#0f1f2a;color:#e3ecf1;border-color:#2b4150}
-.bk-tabs{margin:0 16px;background:#0f1f2a;border-color:#2b4150}
-.bk-tabs button{color:#8fa3b1;flex:1}
-.bk-tabs button[aria-pressed="true"]{background:#d14d8b;color:#fff}
-.bk-body{padding:18px 16px;display:grid;justify-items:center;text-align:center;gap:10px}
-.bk-start p{color:#8fa3b1}
-.bk-dial{width:min(70vw,280px);aspect-ratio:1;border-radius:50%;border:3px solid #2b4150;display:grid;place-items:center;margin-top:10px;background:radial-gradient(circle,#0f2533,#07131c)}
-.bk-arrow{font-size:min(30vw,120px);line-height:1;color:#f28cbc;transition:transform .12s linear}
-.bk-heat{font:800 30px/1.1 var(--f-ui);margin:6px 0 0;letter-spacing:.02em}
-.bk-hint{color:#8fa3b1;margin:0;font-size:14px}
-#bkCanvas{width:min(86vw,340px);height:auto;aspect-ratio:1}
-.bk-bar{width:min(80vw,320px);height:12px;border-radius:6px;background:#0f2533;overflow:hidden;margin-top:14px}
-#bkBarFill{height:100%;width:0;background:linear-gradient(90deg,#4fc1cc,#f28cbc);transition:width .2s}
-.bk-step{color:#8fa3b1;font-size:13px;min-height:18px;margin:0}
-.bk-foot{color:#4b6474;font-size:11.5px;margin-top:18px}
-.bk-lock{color:#ff5fa2;animation:bb1 .5s ease-in-out infinite}
-td.bicho{height:auto;padding:5px 4px;font:500 12px/1.2 var(--f-ui);white-space:normal}
-td.bicho .bb1{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--g-fun);color:#fff;font-weight:700;animation:bb1 1.6s ease-in-out infinite}
-td.bicho .bnorm{color:var(--muted)}
-@keyframes bb1{50%{opacity:.6}}
-/* Spots favoris */
-.spot.notfav{border-style:dashed}
-.spot.allspots{background:none;border-style:dashed;color:var(--accent)}
-.spot.allspots small{color:var(--muted)}
-.sp-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 22px}
-.sp-town h4{margin:0 0 4px;font:600 11.5px var(--f-ui);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.sp-reg{grid-column:1/-1;margin:6px 0 -4px;font:700 15px var(--f-ui);border-bottom:1px solid var(--line);padding-bottom:4px}
-.sp-row{display:flex;align-items:center;gap:4px;border-radius:6px}
-.sp-row.cur{background:var(--accent-soft)}
-.sp-star{border:0;background:none;font-size:20px;line-height:1;width:34px;height:34px;color:var(--line-strong);flex:0 0 auto}
-.sp-star[aria-pressed="true"]{color:var(--star)}
-.sp-go{border:0;background:none;text-align:left;font-size:15px;font-weight:600;padding:6px 4px;flex:1}
-.sp-go:hover{color:var(--accent)}
-.sp-go em{font-style:normal;font-weight:500;font-size:11px;color:var(--muted);margin-left:4px}
-/* Compte */
-.acc-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
-.linkbtn{border:0;background:none;color:var(--muted);text-decoration:underline;font-size:13px;padding:4px}
-.linkbtn:hover{color:var(--accent)}
-.acc-who{margin:0;font-size:14px}
-.acc-imp{margin-top:10px;padding:10px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--bg);font-size:13.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
-/* Téléphone */
-@media (max-width:640px){
-  .wrap{padding-inline:max(14px, env(safe-area-inset-left))}
-  header.top{gap:10px}
-  .brand h1{font-size:23px}
-  .brand p{display:none}
-  header.top{position:relative}
-  .status{gap:6px;width:100%;justify-content:flex-start}
-  #updated{display:none}
-  .btn{padding:5px 9px;font-size:12.5px}
-  .tchip{padding:3px 8px;gap:4px}
-  .tchip b{font-size:16px}
-  .tchip small{font-size:9.5px}
-  /* Profil : pastille seule, en haut à droite à côté du logo */
-  .who{position:absolute;top:0;right:0;padding:3px}
-  #whoName{display:none}
-  .controls>div{flex:0 0 auto}
-  .seg-lab{font-size:10px;margin-bottom:2px}
-  .spots{flex-wrap:nowrap;overflow-x:auto;margin-inline:-14px;padding-inline:14px;padding-bottom:4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-  .spots::-webkit-scrollbar{display:none}
-  .spot{flex:0 0 auto}
-  .head{margin-top:16px}
-  .head h2{font-size:20px}
-  .meta{font-size:13px;gap:4px 12px}
-  .controls{gap:10px}
-  .seg button{padding:6px 10px}
-  .block{margin-inline:-14px;border-radius:0;border-inline:0}
-  table.fc th.lab{padding:0 6px;font-size:11px;position:static}
-  table.fc th.lab small{font-size:9.5px}
-  .bt-info{display:none}
-  .legend{grid-template-columns:1fr}
-  .rate{grid-template-columns:repeat(6,1fr)}
-}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <header class="top">
-    <div class="brand"><h1>Olatuak<span>.</span></h1><p>Prévisions surf · Côte basque</p></div>
-    <div class="status"><div class="temps" id="temps" aria-label="Températures actuelles"></div><span id="updated">–</span><button class="btn" id="refresh" type="button">Actualiser</button><button class="btn" id="custom" type="button">Personnaliser</button><button class="who" id="who" type="button" aria-label="Changer de profil"><span class="avatar" id="avatar">M</span><span id="whoName">Moi</span></button></div>
-  </header>
-
-  <nav class="spots" id="spots" aria-label="Spots"></nav>
-
-  <section class="head">
-    <div>
-      <h2 id="spotName">–</h2>
-      <div class="meta" id="spotMeta"></div>
-      <div class="sess-bar"><button class="btn primary" id="logBtn" type="button">+ Noter une session</button><button class="btn" id="mySess" type="button">Mes sessions</button><button class="btn" id="dirBtn" type="button">Personnaliser le spot</button><a class="btn cam" id="camBtn" href="#" target="_blank" rel="noopener" hidden>Webcam ↗</a></div>
-    </div>
-    <button class="btn disp-btn" id="dispBtn" type="button" aria-expanded="false">Affichage ▾</button>
-    <div class="controls">
-      <div><span class="seg-lab">Pas</span><div class="seg" id="segStep"><button type="button" data-v="3">3 h</button><button type="button" data-v="1">1 h</button></div></div>
-      <div><span class="seg-lab">Jours</span><div class="seg" id="segDays"><button type="button" data-v="3">3</button><button type="button" data-v="7">7</button><button type="button" data-v="10">10</button></div></div>
-      <div><span class="seg-lab">Direction</span><div class="seg" id="segDir"><button type="button" data-v="arrow">Flèches</button><button type="button" data-v="deg">Degrés</button></div></div>
-      <div><span class="seg-lab">Nuit</span><div class="seg" id="segNight"><button type="button" data-v="hide">Masquée</button><button type="button" data-v="show">Affichée</button></div></div>
-    </div>
-  </section>
-
-  <div class="viewtabs" id="viewTabs" role="tablist" aria-label="Affichage">
-    <button type="button" role="tab" data-view="fc">Prévisions</button>
-    <button type="button" role="tab" data-view="hist">10 derniers jours</button>
-    <button type="button" role="tab" data-view="meteo">Météo</button>
-    <button type="button" role="tab" data-view="map">Carte</button>
-  </div>
-  <section id="meteoView" hidden><div class="wx-grid" id="wxGrid"></div><p class="pd-hint">Météo Open-Meteo (meilleur modèle disponible pour le spot). Températures en °C, vent en nœuds.</p></section>
-  <section id="mapView" hidden>
-    <div class="map-bar">
-      <div class="seg" id="segLayer"><button type="button" data-v="swell">Houle</button><button type="button" data-v="period">Période</button><button type="button" data-v="wind">Vent</button></div>
-      <div class="seg" id="segZoom"><button type="button" data-z="monde">Monde</button><button type="button" data-z="atlantique">Atlantique</button><button type="button" data-z="basque">Côte basque</button></div>
-    </div>
-    <div class="map-wrap">
-      <div class="map-frame" id="mapFrame"></div>
-      <div class="map-load" id="mapLoad" role="status">Chargement de la carte…</div>
-      <div class="map-legend" id="mapLegend"></div>
-    </div>
-    <div class="map-time">
-      <button class="btn primary" type="button" id="mapPlay" aria-label="Lancer l'animation">▶</button>
-      <input type="range" id="mapSlider" min="0" max="0" value="0" aria-label="Moment de la prévision">
-      <span class="map-when" id="mapWhen">–</span>
-    </div>
-    <p class="pd-hint">Touche la carte pour lire les valeurs à un endroit. Les flèches glissent dans le sens de la houle (ou du vent) : plus elles sont grandes, plus la houle est grosse ; plus elles vont vite, plus la période est longue. Appuie sur ▶ pour voir la houle traverser l'océan sur les 7 prochains jours. <span id="mapStamp"></span> Données Open-Meteo (vagues MFWAM / ECMWF WAM, vent ECMWF), côtes Natural Earth. <a id="windyLink" href="https://www.windy.com" target="_blank" rel="noopener">Comparer sur Windy ↗</a></p>
-  </section>
-  <div id="out"><div class="block"><div class="msg"><b>Chargement des prévisions…</b>Houle, vent et marée depuis Open-Meteo.</div></div></div>
-
-  <section class="legend" id="legend"></section>
-
-  <section class="notes">
-    <p><b>Énergie (kJ)</b> : somme de l'énergie de la houle 1, de la houle 2 et de la mer du vent, chacune calculée par E = ρ·g²·H²·T² / 16π ≈ 1,96 × H² × T² (H = hauteur en m, T = période en s), la même base que la ligne « Swell energy » de <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a>. Comme <a href="https://www.surfline.com" target="_blank" rel="noopener">Surfline</a>, on tient compte de toutes les houles et pas seulement de la principale : une houle de fond secondaire compte. Repère Surfline : environ 22 kJ pour une petite journée de 2-3 pieds en houle courte. 1 m à 10 s ≈ 200 kJ, 2 m à 14 s ≈ 1 540 kJ. À hauteur égale, une houle longue porte beaucoup plus d'énergie. Pour bien la lire : <a href="https://www.surf-forecast.com/greenroom/how-surf-forecasts-wave-energy-tool-is-like-volume-for-surfboards/" target="_blank" rel="noopener">l'énergie des vagues expliquée par Surf-Forecast</a>. Touche une hauteur de houle dans le tableau pour voir la houle 1, la houle 2 et la mer du vent.</p>
-    <p><b>Marée</b> calculée par analyse harmonique des mesures du marégraphe de Socoa (SHOM, 1990–2026, 54 ondes, cycle lunaire de 18,6 ans inclus). Testée sur 2025–2026, des années non utilisées pour le calcul : heure des PM/BM à 2 min près en médiane, hauteur à 7 cm. Hauteurs en mètres au-dessus du zéro hydrographique, comme dans l'annuaire. S'y ajoute la <b>surcote météo</b> : la mer monte d'environ 1 cm par hPa sous 1013 hPa et baisse au-dessus. Sur les jours de forte dépression, cette correction divise l'erreur par deux.</p>
-    <p><b>Coefficient</b> calculé à partir de la marée astronomique de Brest (marégraphe SHOM, 2000–2026) : marnage / 6,10 m × 100, comme le coefficient officiel. Vérifié sur les grandes marées de 2015 (119), à ±3 environ.</p>
-    <p><b>Houle</b> : modèle GFS-Wave 0,16° (NOAA), le même que Windguru, au large du spot (Météo-France en secours), sans effet de réfraction ni de bathymétrie locale. <b>Vent de synthèse</b> : AROME 1,3 km sur 2 jours, puis ARPEGE, puis ECMWF. <b>Note</b> indicative, calculée depuis l'énergie, la période et le vent par rapport à l'orientation de la plage.</p>
-    <p>Données : Open-Meteo.com (Météo-France, DWD, ECMWF, NOAA), licence CC BY 4.0. Marégraphes : REFMAR / Shom, Licence Ouverte 2.0 (doi:10.17183/REFMAR). Ces prédictions ne sont pas vérifiées par le Shom. <a href="confidentialite.html">Confidentialité et mentions légales</a>.</p>
-    <p><button type="button" class="linkbtn bicho-open" id="bichoOpen">🦌</button></p>
-  </section>
-</div>
-
-<dialog class="prefs" id="prefs" aria-labelledby="pdTitle">
-  <div class="pd-head"><h2 id="pdTitle">Personnaliser</h2><button class="btn" type="button" data-close>Fermer</button></div>
-  <div class="pd-body">
-    <section class="pd-sec" id="accSec">
-      <h3>Compte</h3>
-      <form id="accForm">
-        <div class="frow">
-          <label>Email<input type="email" id="accEmail" autocomplete="email" required></label>
-          <label>Mot de passe<input type="password" id="accPass" autocomplete="current-password" minlength="8" required></label>
-        </div>
-        <div class="acc-btns"><button class="btn primary" type="submit">Se connecter</button><button class="btn" type="button" id="accSignup">Créer un compte</button><button class="linkbtn" type="button" id="accForgot">Mot de passe oublié ?</button></div>
-      </form>
-      <form id="accNewPass" hidden>
-        <div class="frow"><label>Nouveau mot de passe<input type="password" id="accNewPw" autocomplete="new-password" minlength="8" required></label></div>
-        <div class="acc-btns"><button class="btn primary" type="submit">Enregistrer le mot de passe</button></div>
-      </form>
-      <div id="accIn" hidden>
-        <p class="acc-who">Connecté : <b id="accMail"></b></p>
-        <div id="accImport"></div>
-        <div class="acc-btns"><button class="btn" type="button" id="accLogout">Se déconnecter</button><button class="btn danger" type="button" id="accDelete">Supprimer mon compte</button></div>
-      </div>
-      <p class="fmsg" id="accMsg" role="status"></p>
-      <p class="pd-hint">Facultatif et gratuit : avec un compte, tes réglages et tes sessions te suivent sur tous tes appareils. Personne d'autre ne peut les voir. Nous mesurons l'utilisation de l'appli de façon anonyme pour l'améliorer. <a href="confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></p>
-    </section>
-    <section class="pd-sec" id="adminSec" hidden>
-      <h3>Administration</h3>
-      <label class="chk"><input type="checkbox" id="admBicho"> Bichomètre activé pour tout le monde</label>
-      <p class="fmsg" id="admMsg" role="status"></p>
-      <p class="pd-hint">Visible uniquement par toi. S'applique à tous les utilisateurs à leur prochaine ouverture d'Olatuak.</p>
-      <div class="acc-btns"><button class="btn" type="button" id="admUsersBtn">Voir les visiteurs</button></div>
-      <div id="admUsers" style="overflow-x:auto"></div>
-    </section>
-    <section class="pd-sec" id="profSec">
-      <h3>Profil sans compte</h3>
-      <div class="profiles" id="profList"></div>
-      <form class="newp" id="newProf"><input id="newName" maxlength="20" placeholder="Nom d'un nouveau profil" aria-label="Nom du nouveau profil"><button class="btn" type="submit">Créer</button></form>
-      <p class="pd-hint">Sans compte, chaque profil garde ses réglages et ses sessions dans ce navigateur uniquement.</p>
-    </section>
-    <section class="pd-sec">
-      <h3>Lignes du tableau</h3>
-      <div class="rowgrid" id="rowChecks"></div>
-    </section>
-    <section class="pd-sec">
-      <h3>Apparence</h3>
-      <div class="seg" id="segTheme"><button type="button" data-v="auto">Comme le téléphone</button><button type="button" data-v="light">Clair</button><button type="button" data-v="dark">Sombre</button></div>
-    </section>
-    <section class="pd-sec">
-      <h3>Blocs détaillés</h3>
-      <div class="rowgrid" id="blockChecks"></div>
-    </section>
-  </div>
-  <div class="pd-foot"><button class="btn danger" type="button" id="delProf">Supprimer ce profil</button><button class="btn" type="button" id="resetProf">Tout réafficher</button></div>
-</dialog>
-
-
-<dialog class="bicho-dlg" id="bichoDlg" aria-labelledby="bkTitle">
-  <div class="bk-head"><h2 id="bkTitle">Bichomètre <small>mode terrain</small></h2><button class="btn" type="button" data-close>Fermer</button></div>
-  <div class="seg bk-tabs" id="bkTabs"><button type="button" data-v="compass">Boussole</button><button type="button" data-v="radar">Radar</button><button type="button" data-v="scan">Scan</button></div>
-  <div class="bk-body">
-    <div class="bk-start" id="bkStart"><p>Active les capteurs du téléphone (boussole, mouvement, son).</p><button class="btn primary" type="button" id="bkGo">Activer les capteurs</button></div>
-    <div class="bk-pane" id="bkCompass" hidden>
-      <div class="bk-dial"><div class="bk-arrow" id="bkArrow">▲</div></div>
-      <p class="bk-heat" id="bkHeat">…</p>
-      <p class="bk-hint" id="bkHint">Tourne sur toi-même, téléphone à plat.</p>
-    </div>
-    <div class="bk-pane" id="bkRadar" hidden><canvas id="bkCanvas" width="320" height="320"></canvas><p class="bk-hint" id="bkRadarTxt">Balayage en cours…</p></div>
-    <div class="bk-pane" id="bkScan" hidden>
-      <p class="bk-hint">Secoue le téléphone pour scanner la zone.</p>
-      <div class="bk-bar"><div id="bkBarFill"></div></div>
-      <p class="bk-step" id="bkStep">&nbsp;</p>
-      <p class="bk-heat" id="bkVerdict">&nbsp;</p>
-      <button class="btn" type="button" id="bkScanBtn">Scanner sans secouer</button>
-    </div>
-    <p class="bk-foot">100 % fictif : aucune position ni personne réelle, tout est tiré au sort.</p>
-  </div>
-</dialog>
-
-<dialog class="prefs" id="spotsDlg" aria-labelledby="spTitle">
-  <div class="pd-head"><h2 id="spTitle">Mes spots</h2><button class="btn" type="button" data-close>Fermer</button></div>
-  <div class="pd-body">
-    <p class="pd-hint">Touche ★ pour mettre un spot en favori : il apparaît en haut de l'écran. Touche le nom d'un spot pour voir ses prévisions.</p>
-    <div class="acc-btns"><button class="btn primary" type="button" id="newSpotBtn">+ Créer ton spot</button></div>
-    <div class="sp-list" id="spotPick"></div>
-  </div>
-</dialog>
-
-<dialog class="prefs" id="newSpotDlg" aria-labelledby="nsTitle">
-  <div class="pd-head"><h2 id="nsTitle">Créer ton spot</h2><button class="btn" type="button" data-close>Fermer</button></div>
-  <div class="pd-body">
-    <p class="pd-hint">1. Touche la carte pour placer ton spot, dans l'eau juste devant le pic. Zoome pour être précis. La zone est limitée au golfe de Gascogne, là où la marée de Socoa reste valable.</p>
-    <div id="nsMap" class="ns-map"></div>
-    <form class="sform" id="nsForm">
-      <p class="pd-hint" id="nsWhere">Aucun point placé.</p>
-      <label class="gl">2. Nom du spot<input id="nsName" maxlength="30" required placeholder="Ex. : Le pic du phare"></label>
-      <label class="gl">Commune<input id="nsTown" maxlength="30" required placeholder="Remplie quand tu places le spot"></label>
-      <p class="pd-hint">3. À toi de dire quelles directions marchent ici (0° = nord, 90° = est, 180° = sud, 270° = ouest). Le vent : celui qui vient de la terre, offshore.</p>
-      <div class="dirgrid">
-        <span>Bonne houle de</span><label><input type="number" id="nsSw0" min="0" max="359" inputmode="numeric" required aria-label="Bonne houle : de (degrés)">°</label><span>à</span><label><input type="number" id="nsSw1" min="0" max="359" inputmode="numeric" required aria-label="Bonne houle : à (degrés)">°</label>
-        <span>Bon vent de</span><label><input type="number" id="nsWi0" min="0" max="359" inputmode="numeric" required aria-label="Bon vent : de (degrés)">°</label><span>à</span><label><input type="number" id="nsWi1" min="0" max="359" inputmode="numeric" required aria-label="Bon vent : à (degrés)">°</label>
-      </div>
-      <p class="fmsg" id="nsMsg" role="status"></p>
-      <div><button class="btn primary" type="submit">Créer le spot</button></div>
-    </form>
-  </div>
-</dialog>
-
-<dialog class="prefs" id="dirDlg" aria-labelledby="dirTitle">
-  <div class="pd-head"><h2 id="dirTitle">Bonnes directions</h2><button class="btn" type="button" data-close>Fermer</button></div>
-  <div class="pd-body">
-    <section class="pd-sec">
-      <div class="dirgrid">
-        <span>Houle venant de</span><label><input type="number" id="dSw0" min="0" max="359" inputmode="numeric" aria-label="Houle : de (degrés)">°</label><span>à</span><label><input type="number" id="dSw1" min="0" max="359" inputmode="numeric" aria-label="Houle : à (degrés)">°</label>
-        <span>Vent venant de</span><label><input type="number" id="dWi0" min="0" max="359" inputmode="numeric" aria-label="Vent : de (degrés)">°</label><span>à</span><label><input type="number" id="dWi1" min="0" max="359" inputmode="numeric" aria-label="Vent : à (degrés)">°</label>
-      </div>
-      <div class="acc-btns"><button class="btn" type="button" id="dirReset">Valeurs par défaut</button></div>
-      <p class="pd-hint">Pour le spot affiché. Sens des aiguilles d'une montre : 0° = nord, 90° = est, 180° = sud, 270° = ouest. Ex. houle 280° à 320° = ouest-nord-ouest à nord-ouest. Ces plages colorent les lignes Direction et comptent dans la note.</p>
-    </section>
-  </div>
-</dialog>
-
-<dialog class="prefs" id="sessDlg" aria-labelledby="sdTitle">
-  <div class="pd-head"><h2 id="sdTitle">Noter une session</h2><button class="btn" type="button" data-close>Fermer</button></div>
-  <div class="pd-body">
-    <form class="sform" id="sessForm">
-      <div class="frow">
-        <label>Spot<select id="sfSpot"></select></label>
-        <label>Date<input type="date" id="sfDate" required></label>
-      </div>
-      <div class="frow">
-        <label>Début<select id="sfStart"></select></label>
-        <label>Fin<select id="sfEnd"></select></label>
-      </div>
-      <div>
-        <div class="seg-lab">Ta note</div>
-        <div class="rate" id="sfRate" role="group" aria-label="Note de 0 à 10"></div>
-        <div class="rate-lab"><span>0 · nul</span><span>10 · parfait</span></div>
-      </div>
-      <div class="frow"><label>Commentaire (facultatif)<textarea id="sfNote" maxlength="200" placeholder="Ex. : fermé à marée haute, super sur la droite"></textarea></label></div>
-      <div class="fmsg" id="sfMsg" role="status"></div>
-      <div><button class="btn primary" type="submit" id="sfSave">Enregistrer la session</button></div>
-    </form>
-    <section class="pd-sec">
-      <h3>Mes sessions</h3>
-      <div class="slist" id="sessList"></div>
-    </section>
-  </div>
-</dialog>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
-<script>
-"use strict";
+// Olatuak : interface de l'appli. Les calculs purs sont dans src/lib/ (testés par npm test).
+import { createClient } from "@supabase/supabase-js";
+import { SPOTS, CAMS, SWELL } from "../lib/spots.js";
+import { TZ, H, tp, nowNaive, hhmm, dayKey, DAYS, card, toNaive } from "../lib/time.js";
+import { DEG, norm, inArc, arcGap, arcMid, clamp, angDiff, windComp, similarity, ENERGY } from "../lib/physics.js";
+import { TIDE, tideAt, tideSeries, extremes, coefsByDay } from "../lib/tide.js";
+import { rgbAt, hslRgb } from "../lib/colors.js";
+import { baseScore } from "../lib/score.js";
+import { spotTitle, spotPath } from "../lib/spot-info.js";
 // ---------- Spots (orientation = direction vers laquelle la plage fait face, en degrés) ----------
-const SPOTS = [
-  {id:"barre",       town:"Anglet",            name:"La Barre",          lat:43.527, lon:-1.524, face:290},
-  {id:"cavaliers",   town:"Anglet",            name:"Les Cavaliers",     lat:43.516, lon:-1.530, face:290},
-  {id:"sablesdor",   town:"Anglet",            name:"Sables d'Or",       lat:43.498, lon:-1.545, face:295},
-  {id:"grandeplage", town:"Biarritz",          name:"Grande Plage",      lat:43.484, lon:-1.559, face:315},
-  {id:"cotebasques", town:"Biarritz",          name:"Côte des Basques",  lat:43.477, lon:-1.568, face:280},
-  {id:"ilbarritz",   town:"Bidart",            name:"Ilbarritz",         lat:43.455, lon:-1.578, face:300},
-  {id:"pavillon",    town:"Bidart",            name:"Pavillon Royal",    lat:43.451, lon:-1.581, face:300},
-  {id:"erretegia",   town:"Bidart",            name:"Erretegia",         lat:43.445, lon:-1.588, face:305},
-  {id:"centmarches", town:"Bidart",            name:"100 Marches",       lat:43.440, lon:-1.594, face:305},
-  {id:"bidartcentre",town:"Bidart",            name:"Centre",            lat:43.4376, lon:-1.5961, face:305},
-  {id:"uhabia",      town:"Bidart",            name:"Uhabia",            lat:43.4311, lon:-1.5987, face:310},
-  {id:"parlementia", town:"Guéthary",          name:"Parlementia",       lat:43.428, lon:-1.611, face:310, reef:true},
-  {id:"avalanche",   town:"Guéthary",          name:"Avalanche",         lat:43.430, lon:-1.622, face:310, big:true},
-  {id:"cenitz",      town:"Guéthary",          name:"Cenitz",            lat:43.423, lon:-1.619, face:320},
-  {id:"mayarco",     town:"Saint-Jean-de-Luz", name:"Mayarco",           lat:43.418, lon:-1.626, face:320},
-  {id:"lafitenia",   town:"Saint-Jean-de-Luz", name:"Lafitenia",         lat:43.415, lon:-1.627, face:320},
-  {id:"gauchelafit", town:"Saint-Jean-de-Luz", name:"Gauche de Lafit",   lat:43.414, lon:-1.630, face:325, reef:true},
-  {id:"erromardie",  town:"Saint-Jean-de-Luz", name:"Erromardie",        lat:43.403, lon:-1.643, face:330},
-  {id:"saintebarbe", town:"Saint-Jean-de-Luz", name:"Sainte-Barbe",      lat:43.393, lon:-1.658, face:325, reef:true},
-  {id:"bougie",      town:"Ciboure",           name:"La Bougie (Socoa)", lat:43.394, lon:-1.684, face:20,  reef:true},
-  {id:"belharra",    town:"Urrugne",           name:"Belharra",          lat:43.405, lon:-1.665, face:315, big:true},
-  {id:"deuxjumeaux", town:"Hendaye",           name:"Les Deux Jumeaux",  lat:43.380, lon:-1.763, face:340, reef:true},
-  {id:"hendaye",     town:"Hendaye",           name:"Grande Plage",      lat:43.375, lon:-1.772, face:345},
-  // Landes (côte rectiligne face à l'ouest ; marée de Socoa, à quelques minutes près)
-  {id:"labenne",     town:"Labenne",           name:"Labenne Océan",     lat:43.5955, lon:-1.4605, face:280, region:"Landes"},
-  {id:"graviere",    town:"Hossegor",          name:"La Gravière",       lat:43.6705, lon:-1.4440, face:280, region:"Landes"},
-  {id:"penon",       town:"Seignosse",         name:"Le Penon",          lat:43.7080, lon:-1.4370, face:280, region:"Landes"},
-  {id:"messanges",   town:"Messanges",         name:"Messanges",         lat:43.8135, lon:-1.4040, face:280, region:"Landes"},
-  {id:"biscarrosse", town:"Biscarrosse",       name:"Biscarrosse Plage", lat:44.4470, lon:-1.2560, face:280, region:"Landes"},
-];
 const WIND_MODELS = [
   {id:"meteofrance_arome_france_hd", name:"AROME HD", info:"Météo-France · 1,3 km · 2 jours"},
   {id:"meteofrance_arpege_europe",   name:"ARPEGE",   info:"Météo-France · 10 km · 4 jours"},
@@ -612,7 +20,6 @@ const WAVE_MODELS = [
   {id:"ecmwf_wam025",     name:"ECMWF WAM", info:"ECMWF"},
   {id:"ncep_gfswave016",  name:"GFS-Wave",  info:"NOAA · comme Windguru"},
 ];
-const TZ = "Europe/Paris";
 const PHONE = matchMedia("(max-width:640px)");
 
 // ---------- Préférences (confort uniquement) ----------
@@ -649,7 +56,7 @@ function useProfile(name){
 useProfile(store.current);
 // Compte Supabase (clé publique : la sécurité est assurée par les règles d'accès de la base)
 const SB_URL = "https://ednyjpdqbxfzbicbmieq.supabase.co", SB_KEY = "sb_publishable_2dGM071JZVxkA6rPuCHD_A_KNtLgJMy";
-const sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+const sb = createClient(SB_URL, SB_KEY);
 // Réglages de l'appli pour tout le monde (table app_config) ; copie locale pour l'affichage immédiat
 const APP = {bicho:true, ...load("appcfg", {})};
 let account = null;   // {id, email, ready}
@@ -658,6 +65,20 @@ if(store.account && store.account.state){
   account = {id:store.account.id, email:store.account.email, ready:false};
   state = store.account.state = {...defaultPrefs(), ...store.account.state};
 }
+// Page d'un spot (/spots/<id>/) : on ouvre sur ce spot, même après la synchro du compte, tant que l'utilisateur n'en change pas
+const PAGE_SPOT = document.body.dataset.spot || null;
+let pageSpotActive = !!PAGE_SPOT;
+function applyPageSpot(){ if(pageSpotActive && SPOTS.some(s=>s.id===PAGE_SPOT)) state.spot = PAGE_SPOT; }
+// Sur une page de spot, l'adresse suit le spot choisi (lien à partager, rechargement)
+function syncSpotUrl(){
+  if(!PAGE_SPOT) return;
+  if(state.spot !== PAGE_SPOT) pageSpotActive = false;
+  const base = SPOTS.slice(0, BASE_SPOTS).find(s=>s.id===state.spot);
+  const path = base ? spotPath(base) : "/";
+  if(location.pathname !== path) history.replaceState(history.state, "", path + location.search + location.hash);
+  if(base) document.title = spotTitle(base);
+}
+applyPageSpot();
 let prefsTimer = null;
 const prefsOf = st => { const {sessions, ...rest} = st; return rest; };
 function syncPrefsSoon(){
@@ -669,14 +90,6 @@ const persist = () => { save("profiles", store); syncPrefsSoon(); };
 const shown = id => !state.hidden.includes(id);
 
 // ---------- Temps (heures locales "naïves" traitées en UTC pour éviter les soucis de changement d'heure) ----------
-const H = 3600e3;
-const tp = s => Date.UTC(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10), +s.slice(11,13)||0, +s.slice(14,16)||0);
-const nowNaive = () => { const p = new Intl.DateTimeFormat("sv-SE",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(new Date()); return tp(p.replace(" ","T")); };
-const hhmm = ms => { const d=new Date(ms); return String(d.getUTCHours()).padStart(2,"0")+":"+String(d.getUTCMinutes()).padStart(2,"0"); };
-const dayKey = ms => new Date(ms).toISOString().slice(0,10);
-const DAYS = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
-const CARD = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"];
-const card = d => CARD[Math.round(((d%360)+360)%360/22.5)%16];
 
 // ---------- Récupération des données ----------
 const cache = {};
@@ -713,68 +126,9 @@ function series(json, base, model){
 }
 
 // ---------- Marée ----------
-// Constantes harmoniques calculées à partir des mesures horaires validées des marégraphes SHOM
-// (REFMAR, Licence Ouverte 2.0, DOI 10.17183/REFMAR) : Socoa 1990-2026, Brest 2000-2026.
-// Hauteur (m, zéro hydro) = z0 + tendance x années depuis 2000 + somme A·cos(w·t - phi), t en heures UTC depuis 2000-01-01.
-const TIDE = {
-  socoa: {"z0":2.5649,"trend":0.00281,"cons":[["M2",28.9841042,1.3276,316.85],["S2",30.0,0.4624,125.71],["N2",28.4397295,0.2799,65.4],["K2",30.0821372,0.1328,283.81],["O1",13.9430356,0.0708,194.57],["K1",15.0410686,0.0617,58.91],["nu2",28.5125831,0.0533,34.28],["M2-N",28.9818978,0.0523,14.56],["mu2",27.9682084,0.0461,138.73],["Sa",0.0410666,0.0457,297.1],["K2+N",30.0843436,0.0405,42.44],["2N2",27.8953548,0.0397,175.44],["L2",29.5284789,0.0324,25.58],["M4",57.9682084,0.0284,54.67],["Ssa",0.0821372,0.0266,248.72],["T2",29.9589334,0.0259,120.17],["Q1",13.3986609,0.0232,277.62],["P1",14.9589314,0.0196,64.73],["MN4",57.4238337,0.0138,136.04],["M3",43.4761563,0.0136,302.23],["O1-N",13.9408292,0.013,68.37],["N2-N",28.4375231,0.012,120.06],["eps2",27.4238337,0.0104,241.32],["MS4",58.9841042,0.01,262.24],["Mm",0.5443747,0.0084,142.82],["K1+N",15.043275,0.0081,180.96],["lam2",29.4556253,0.0079,54.24],["eta2",30.6265119,0.0069,167.96],["Mm+N",0.5465811,0.0063,218.01],["M2+N",28.9863106,0.0062,26.5],["Mf",1.098033,0.006,128.42],["S1",15.000002,0.0053,201.83],["R2",30.0410666,0.0053,302.77],["M6",86.9523126,0.0047,58.52],["2Q1",12.8542862,0.0044,5.09],["sig1",12.9271398,0.0042,341.54],["rho1",13.4715145,0.0041,255.47],["SK3",45.0410686,0.0039,22.29],["Q1-N",13.3964545,0.0037,177.05],["Msf",1.0158958,0.0037,265.33],["Mm-N",0.5421683,0.0035,328.18],["2MS6",87.9682084,0.0031,241.93],["NO1",14.4966939,0.0031,139.72],["2MN6",86.4079379,0.003,161.33],["nu2-N",28.5103767,0.003,100.55],["mu2-N",27.966002,0.0029,205.4],["Mf-N",1.0958266,0.0026,196.27],["Mf+N",1.1002394,0.0025,147.31],["MK4",59.0662414,0.0024,63.66],["3MS8",116.9523126,0.0022,277.16],["J1",15.5854433,0.0022,351.85],["2N2-N",27.8931484,0.0022,246.26],["K1-N",15.0388622,0.0021,105.81],["K2-N",30.0799308,0.0021,317.18]]},
-  brest: {"z0":4.1564,"trend":0.00489,"cons":[["M2",28.9841042,2.0506,332.13],["S2",30.0,0.7524,148.55],["N2",28.4397295,0.4174,82.27],["K2",30.0821372,0.2132,306.5],["mu2",27.9682084,0.0881,191.16],["M2-N",28.9818978,0.0777,30.16],["nu2",28.5125831,0.0773,44.56],["L2",29.5284789,0.0656,14.97],["K2+N",30.0843436,0.0655,70.2],["K1",15.0410686,0.065,65.75],["O1",13.9430356,0.0648,201.14],["M4",57.9682084,0.0577,193.12],["2N2",27.8953548,0.0575,192.66],["Sa",0.0410666,0.0538,326.26],["T2",29.9589334,0.0414,137.07],["MS4",58.9841042,0.0354,43.59],["M6",86.9523126,0.0308,305.79],["Ssa",0.0821372,0.0273,263.83],["lam2",29.4556253,0.0262,23.03],["P1",14.9589314,0.0225,72.97],["MN4",57.4238337,0.0206,277.07],["eps2",27.4238337,0.0205,303.21],["Q1",13.3986609,0.0201,283.59],["2MN6",86.4079379,0.0198,45.49],["M3",43.4761563,0.0195,350.62],["2SM2",31.0158958,0.0177,89.95],["2MS6",87.9682084,0.0163,147.47],["N2-N",28.4375231,0.0158,140.39],["MSN2",30.5443747,0.0139,160.15],["O1-N",13.9408292,0.0126,77.28],["eta2",30.6265119,0.0106,223.03],["MK4",59.0662414,0.0102,204.11],["Mm",0.5443747,0.0093,89.92],["Mf",1.098033,0.0087,131.58],["K1+N",15.043275,0.0086,189.26],["Mm+N",0.5465811,0.0077,248.69],["S1",15.000002,0.0069,191.81],["Msf",1.0158958,0.0068,182.04],["Mf+N",1.1002394,0.0055,256.05],["M2+N",28.9863106,0.0054,7.16],["Mf-N",1.0958266,0.0053,256.27],["SK3",45.0410686,0.0051,65.1],["R2",30.0410666,0.005,343.25],["Mm-N",0.5421683,0.0047,51.92],["2MK6",88.0503456,0.0045,313.5],["Q1-N",13.3964545,0.0042,159.0],["MSN6",87.4238337,0.0042,255.11],["SN4",58.4397295,0.0041,141.57],["sig1",12.9271398,0.0039,345.75],["3MS8",116.9523126,0.0039,275.29],["mu2-N",27.966002,0.0038,251.25],["2Q1",12.8542862,0.0038,5.58],["rho1",13.4715145,0.0035,255.81],["M4-N",57.966002,0.0032,250.28],["MK4+N",59.0684478,0.0032,325.63],["NO1",14.4966939,0.0032,150.28],["M6-N",86.9501062,0.0031,3.94],["nu2-N",28.5103767,0.003,99.81],["K2-N",30.0799308,0.003,31.86],["J1",15.5854433,0.0029,346.21],["2SM6",88.9841042,0.0026,177.52],["L2-N",29.5262725,0.0026,48.5],["2N2-N",27.8931484,0.0025,228.86],["L2+N",29.5306853,0.0025,313.89],["pi1",14.9178648,0.0023,49.24],["M8",115.9364168,0.0022,53.24]]}
-};
-const T_EPOCH = Date.UTC(2000,0,1), DEG = Math.PI/180;
-function tideAt(st, utc, astroOnly){
-  const h = (utc - T_EPOCH)/H;
-  let v = astroOnly ? 0 : st.z0 + st.trend*h/8766;
-  for(const c of st.cons){ if(astroOnly && !(c[1]>10 && c[1]<35)) continue; v += c[2]*Math.cos((c[1]*h - c[3])*DEG); }
-  return v;
-}
-const PARIS = new Intl.DateTimeFormat("sv-SE",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
-const toNaive = utc => { const s = PARIS.format(new Date(utc)); return tp(s.replace(" ","T")) + (+s.slice(17,19)||0)*1000; };
-// Points réguliers [heure locale naïve, hauteur] ; pas en minutes
-function tideSeries(st, utc0, utc1, stepMin, astroOnly){
-  const out = [];
-  for(let u=utc0; u<=utc1; u+=stepMin*60e3) out.push([toNaive(u), tideAt(st, u, astroOnly)]);
-  return out;
-}
-// Pleines et basses mers, affinées par interpolation parabolique
-function extremes(pts){
-  const out = [];
-  for(let i=1;i<pts.length-1;i++){
-    const a=pts[i-1][1], b=pts[i][1], c=pts[i+1][1];
-    const isMax = b>a && b>=c, isMin = b<a && b<=c;
-    if(!isMax && !isMin) continue;
-    const dt = (pts[i+1][0]-pts[i-1][0])/2, den = a-2*b+c, off = den ? 0.5*(a-c)/den : 0;
-    out.push({t:pts[i][0]+off*dt, v:b-0.25*(a-c)*off, type:isMax?"PM":"BM"});
-  }
-  return out;
-}
-// Coefficient (définition SHOM) : marnage astronomique à Brest / 6,10 m x 100
-function coefsByDay(utc0, utc1){
-  const ex = extremes(tideSeries(TIDE.brest, utc0, utc1, 6, true)), byDay = {};
-  ex.forEach((e,i)=>{
-    if(e.type!=="PM") return;
-    const lows = [ex[i-1],ex[i+1]].filter(x=>x && x.type==="BM");
-    if(!lows.length) return;
-    const range = e.v - lows.reduce((s,x)=>s+x.v,0)/lows.length;
-    (byDay[dayKey(e.t)] ||= []).push(Math.max(20, Math.min(120, Math.round(range/6.10*100))));
-  });
-  return byDay;
-}
 
 // ---------- Couleurs (échelles type Windguru) ----------
-// Échelles Windguru : [valeur, R, G, B]. Relevées sur windguru.cz, prolongées au-delà des valeurs observées (*).
-const SCALES = {
-  wind:  [[0,255,255,255],[5,255,255,255],[6,216,253,251],[7,177,251,248],[8,146,249,245],[9,92,248,215],[10,78,249,183],[11,49,251,115],[12,25,253,58],[13,13,254,31],[14,5,255,0],[15,48,252,0],[16,130,247,0],[17,164,245,0],[18,192,244,0],[19,250,240,0],[20,255,217,5],[21,255,169,16],[22,255,140,23],[23,255,98,33],[25,255,53,43],[27,255,36,100],[30,255,21,158],[33,255,8,213],[40,200,0,230]/*  */],
-  wave:  [[0,255,255,255],[0.3,255,255,255],[0.5,245,245,255],[1,222,224,255],[1.5,196,201,255],[2,171,177,255],[2.5,148,155,255],[2.8,131,140,255],[3.3,128,126,248],[5,150,90,235]/* */,[8,190,50,210]/* */],
-  period:[[0,255,255,255],[9,255,255,255],[10,255,251,251],[11,255,238,238],[12,254,220,220],[13,254,200,200],[14,254,188,188],[15,254,173,173],[16,253,150,150],[17,253,130,130],[19,252,105,105],[22,240,70,70]/* */],
-  energy:[[0,255,255,255],[25,245,254,255],[54,224,252,255],[100,198,250,255],[150,169,248,255],[200,144,246,255],[250,115,243,255],[300,86,241,255],[350,57,238,255],[600,20,215,255]/* */,[1000,0,180,250]/* */,[2000,0,130,240]/* */],
-};
 let dark = false;
-function rgbAt(scale, v){
-  const s = SCALES[scale];
-  if(v<=s[0][0]) return s[0].slice(1);
-  if(v>=s[s.length-1][0]) return s[s.length-1].slice(1);
-  for(let i=0;i<s.length-1;i++){ const a=s[i], b=s[i+1]; if(v>=a[0] && v<=b[0]){ const f=(v-a[0])/(b[0]-a[0]); return [1,2,3].map(k=>Math.round(a[k]+(b[k]-a[k])*f)); } }
-}
 // Clair : couleurs Windguru telles quelles. Sombre : même teinte, opacité selon l'intensité (le blanc devient transparent).
 function cellStyle(scale, v){
   if(v==null || isNaN(v)) return "";
@@ -787,7 +141,6 @@ const color = (scale, v) => { const [r,g,b] = rgbAt(scale, v); return `rgb(${r},
 const bg = (scale,v) => { const c=cellStyle(scale,v); return c?` style="${c}"`:""; };
 // Dégradé : chaque case se fond à mi-chemin avec ses voisines (si elles sont à un pas de temps d'écart)
 const scaleRgb = scale => v => { const c = rgbAt(scale, v); return dark && c[0]+c[1]+c[2] > 750 ? null : c; };
-function hslRgb(h, s, l){ const k = n => (n + h/30) % 12, a = s*Math.min(l, 1-l), f = n => l - a*Math.max(-1, Math.min(k(n)-3, 9-k(n), 1)); return [f(0), f(8), f(4)].map(x=>Math.round(x*255)); }
 const noteRgb = v => hslRgb(v*12, 0.72, 0.76);
 function rowStyles(cols, vals, colorFn){
   const cs = vals.map(v => v==null || isNaN(v) ? null : colorFn(v));
@@ -801,16 +154,12 @@ function rowStyles(cols, vals, colorFn){
 
 // ---------- Relation vent / plage ----------
 // Plages « bonne direction » (degrés, sens horaire de a à b) : réglage perso par spot, sinon par défaut
-const norm = d => ((Math.round(d)%360)+360)%360;
 function defaultDirs(spot){
   if(spot.custom) return {sw:spot.sw, wi:spot.wi};
   const [best, win] = SWELL[spot.id] || [spot.face], g = (win || [20])[0];
   return {sw:[norm(best-g), norm(best+g)], wi:[norm(spot.face+135), norm(spot.face+225)]};
 }
 const spotDirs = spot => ({...defaultDirs(spot), ...((state.dirs||{})[spot.id] || {})});
-const inArc = (d, [a,b]) => (d-a+360)%360 <= (b-a+360)%360;
-const arcGap = (d, arc) => inArc(d, arc) ? 0 : Math.min(angDiff(d, arc[0]), angDiff(d, arc[1]));
-const arcMid = ([a,b]) => norm(a + ((b-a+360)%360)/2);
 function windRel(dir, spot){
   if(inArc(dir, spotDirs(spot).wi)) return "off";   // dans ta plage de bon vent
   return angDiff(dir, spot.face)<=45 ? "on" : "cross"; // 0 = vent venant de la mer
@@ -819,80 +168,26 @@ const REL_TXT = {off:"offshore", cross:"side-shore", on:"onshore"};
 // Direction de houle idéale par spot (provenance, en degrés) et tolérance [bonne, moyenne].
 // Les spots abrités (baie de Saint-Jean-de-Luz, Hendaye) ont une fenêtre plus étroite.
 // Webcams en direct (liens : ces sites interdisent l'affichage dans une autre appli)
-const QS = "https://www.quiksilver.fr/surf-webcams/";
-const CAMS = {
-  cotebasques: {url: QS+"biarritz-cote-des-basques.html", label:"Côte des Basques"},
-  grandeplage: {url: QS+"biarritz-la-grande-plage.html", label:"Grande Plage de Biarritz"},
-  sablesdor:   {url: QS+"anglet.html", label:"Anglet, Le Club et Sables d'Or"},
-  parlementia: {url: QS+"guethary.html", label:"Parlementia, Bidart Centre et Guéthary"},
-  bidartcentre:{url: QS+"guethary.html", label:"Parlementia, Bidart Centre et Guéthary"},
-  saintebarbe: {url: QS+"saint-jean-de-luz.html", label:"Saint-Jean-de-Luz, Sainte-Barbe"},
-  hendaye:     {url: QS+"hendaye.html", label:"Hendaye Plage et Deux Jumeaux"},
-  deuxjumeaux: {url: QS+"hendaye.html", label:"Hendaye Plage et Deux Jumeaux"},
-};
 function renderCam(spot){
   const b = document.getElementById("camBtn"), c = CAMS[spot.id];
   b.hidden = !c;
   if(c){ b.href = c.url; b.title = "Webcam en direct : " + c.label + " (Quiksilver / Viewsurf, nouvel onglet)"; }
 }
-const SWELL = {
-  barre:[295], cavaliers:[295], sablesdor:[295], grandeplage:[300], cotebasques:[290],
-  ilbarritz:[300], pavillon:[300], erretegia:[300], centmarches:[300], bidartcentre:[300], uhabia:[300],
-  parlementia:[300], avalanche:[300], cenitz:[300],
-  mayarco:[300], lafitenia:[305], gauchelafit:[300], erromardie:[315],
-  saintebarbe:[320,[15,35]], bougie:[315,[15,35]], belharra:[305],
-  deuxjumeaux:[320,[15,35]], hendaye:[320,[15,35]],
-  labenne:[285,[25]], graviere:[285,[25]], penon:[285,[25]], messanges:[285,[25]], biscarrosse:[285,[25]],
-};
 function swellFit(dir, spot){
   const arc = spotDirs(spot).sw, d = arcGap(dir, arc);
   return {cls: d===0 ? "sw-good" : d<=25 ? "sw-ok" : "sw-bad", txt: d===0 ? "bonne direction" : d<=25 ? "direction moyenne" : "mauvaise direction", best:arcMid(arc), arc};
 }
 
 // ---------- Note /10 ----------
-const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
-const angDiff = (a,b) => Math.abs(((a-b)%360+540)%360-180);
-// Vent décomposé par rapport à la plage : on > 0 = vent de mer (onshore), on < 0 = vent de terre (offshore)
-function windComp(ws, wdir, face){ const r = (((wdir-face)%360+540)%360-180)*DEG; return {on: ws*Math.cos(r), side: Math.abs(ws*Math.sin(r))}; }
 // Conditions d'un créneau, comparables d'une session à l'autre
 function feat(hs, per, dir, ws, wdir, tide, rising, spot){
   if(hs==null || per==null) return null;
   const w = ws!=null && wdir!=null ? windComp(ws, wdir, spot.face) : {on:0, side:0};
   return {hs, per, dir, ws, wdir, on:w.on, side:w.side, tide, rising, e:ENERGY(hs, per)};
 }
-// Note de base, avant tes sessions : énergie de la houle, période et vent par rapport à la plage
-function baseScore(f, spot){
-  if(!f) return null;
-  let s = f.e>100 ? 10*clamp(Math.log(f.e/100)/Math.log(5000/100), 0, 1) : 0;   // seuils pour l'énergie façon Windguru
-  if(f.hs>3.5 && !spot.big) s = Math.min(s, 6);
-  if(spot.big && f.hs<4) s = Math.min(s, 2);
-  if(f.per<8) s -= 2; else if(f.per<10) s -= 1;
-  if(f.dir!=null){ const g = arcGap(f.dir, spotDirs(spot).sw); if(g>25) s -= 2; else if(g>0) s -= 1; }
-  const goodWind = f.wdir!=null && inArc(f.wdir, spotDirs(spot).wi);
-  if(f.ws!=null && !goodWind){
-    if(f.on>0) s -= Math.min(5, 0.25*Math.max(0, f.on-4));
-    s -= Math.min(3, 0.12*Math.max(0, f.side-8));
-    if(-f.on>20) s -= 0.15*(-f.on-20);
-    if(f.ws<5) s += 0.5;
-  }
-  return clamp(s, 0, 10);
-}
-// Ressemblance entre deux créneaux (1 = conditions identiques)
-function similarity(a, b){
-  let d2 = ((a.hs-b.hs)/(0.3*Math.max(0.6,(a.hs+b.hs)/2)))**2 + ((a.per-b.per)/2)**2 + ((a.on-b.on)/5)**2 + ((a.side-b.side)/7)**2;
-  if(a.dir!=null && b.dir!=null) d2 += (angDiff(a.dir,b.dir)/30)**2;
-  if(a.tide!=null && b.tide!=null) d2 += ((a.tide-b.tide)/0.8)**2 + (a.rising!==b.rising ? 0.3 : 0);
-  // Houle 1 / houle 2 (sessions notées depuis novembre 2026 ; ignoré pour les plus anciennes)
-  if(a.s1 && b.s1 && a.s1.d!=null && b.s1.d!=null) d2 += (angDiff(a.s1.d, b.s1.d)/30)**2;
-  if(a.s2 && b.s2){
-    d2 += ((a.s2.h - b.s2.h)/0.4)**2;
-    if(a.s2.h >= 0.3 && b.s2.h >= 0.3) d2 += ((a.s2.p - b.s2.p)/3)**2 + (a.s2.d!=null && b.s2.d!=null ? (angDiff(a.s2.d, b.s2.d)/40)**2 : 0);
-  }
-  return Math.exp(-d2/2);
-}
 // Note finale : moyenne pondérée entre la note de base et tes notes dans des conditions proches
 function scoreFor(f, spot){
-  const base = baseScore(f, spot); if(base==null) return null;
+  const base = baseScore(f, spot, spotDirs(spot)); if(base==null) return null;
   let wsum = 0, rsum = 0, n = 0;
   for(const x of state.sessions){
     if(!x.f) continue;
@@ -908,8 +203,6 @@ const scoreBg = v => `background:hsl(${Math.round(v*12)} 72% 76%);color:#122433`
 const arrow = (dir, title) => dir==null ? "–" : state.dirDeg
   ? `<span class="deg" title="${title}">${Math.round(dir)}°<span class="sub">${card(dir)}</span></span>`
   : `<svg class="arr" viewBox="0 0 20 20" style="transform:rotate(${(dir+180)%360}deg)" role="img" aria-label="${title}"><title>${title}</title><line x1="10" y1="19" x2="10" y2="7" stroke-width="2.2" stroke-linecap="round"/><path d="M10 0.8 L16 9 L10 7.2 L4 9 Z" stroke-width="0.6" stroke-linejoin="round"/></svg>`;
-// Énergie d'une composante de houle (kJ) : ρ·g²·H²·T² / (16π) ≈ 1,96·H²·T² (même base que Windguru) ; on additionne les composantes
-const ENERGY = (h, t) => 1.96*h*h*t*t;
 const fmt = (v, d=0) => v==null ? "–" : (d ? v.toFixed(d) : Math.round(v));
 
 // ---------- Rendu ----------
@@ -1173,6 +466,7 @@ function renderLegend(){
 
 // ---------- Interface ----------
 function renderSpots(){
+  syncSpotUrl();
   const favs = SPOTS.filter(x=>(state.favs||[]).includes(x.id));
   const cur = SPOTS.find(x=>x.id===state.spot);
   const list = cur && !favs.includes(cur) ? [...favs, cur] : favs;
@@ -1774,6 +1068,7 @@ async function useAccount(user){
   const seed = cached || store.users[store.current];   // 1re connexion : on reprend les réglages du profil actuel
   account = {id:user.id, email:user.email, ready:false};
   state = {...defaultPrefs(), ...prefsOf(seed || {}), sessions: cached ? cached.sessions : []};
+  applyPageSpot();
   store.account = {id:user.id, email:user.email, state};
   save("profiles", store); applyAll(); renderAccount();
   try{
@@ -1783,7 +1078,7 @@ async function useAccount(user){
     ]);
     if(p.error) throw p.error; if(r.error) throw r.error;
     if(!account || account.id!==user.id) return;
-    if(p.data && p.data.prefs) Object.assign(state, defaultPrefs(), p.data.prefs);
+    if(p.data && p.data.prefs){ Object.assign(state, defaultPrefs(), p.data.prefs); applyPageSpot(); }
     state.sessions = r.data.map(rowToSess);
     account.ready = true;
     // Admin ? (table admins : seul l'admin peut lire sa propre ligne)
@@ -2175,8 +1470,5 @@ bkDlg.addEventListener("close", ()=>{ bkStop(); document.getElementById("bkStart
 
 // Appli installable : cache hors ligne (uniquement quand le site est servi en http/https)
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){
-  navigator.serviceWorker.register("sw.js").catch(()=>{});
+  navigator.serviceWorker.register("/sw.js").catch(()=>{});
 }
-</script>
-</body>
-</html>

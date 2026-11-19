@@ -1,0 +1,214 @@
+---
+// Corps de l'appli (identique sur l'accueil et les pages de spot). Le contenu est rempli par src/scripts/app.js.
+interface Props { spotTitle?: string }
+const { spotTitle = "–" } = Astro.props;
+---
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>Olatuak<span>.</span></h1><p>Prévisions surf · Côte basque</p></div>
+    <div class="status"><div class="temps" id="temps" aria-label="Températures actuelles"></div><span id="updated">–</span><button class="btn" id="refresh" type="button">Actualiser</button><button class="btn" id="custom" type="button">Personnaliser</button><button class="who" id="who" type="button" aria-label="Changer de profil"><span class="avatar" id="avatar">M</span><span id="whoName">Moi</span></button></div>
+  </header>
+
+  <nav class="spots" id="spots" aria-label="Spots"></nav>
+
+  <section class="head">
+    <div>
+      <h2 id="spotName">{spotTitle}</h2>
+      <div class="meta" id="spotMeta"></div>
+      <div class="sess-bar"><button class="btn primary" id="logBtn" type="button">+ Noter une session</button><button class="btn" id="mySess" type="button">Mes sessions</button><button class="btn" id="dirBtn" type="button">Personnaliser le spot</button><a class="btn cam" id="camBtn" href="#" target="_blank" rel="noopener" hidden>Webcam ↗</a></div>
+    </div>
+    <button class="btn disp-btn" id="dispBtn" type="button" aria-expanded="false">Affichage ▾</button>
+    <div class="controls">
+      <div><span class="seg-lab">Pas</span><div class="seg" id="segStep"><button type="button" data-v="3">3 h</button><button type="button" data-v="1">1 h</button></div></div>
+      <div><span class="seg-lab">Jours</span><div class="seg" id="segDays"><button type="button" data-v="3">3</button><button type="button" data-v="7">7</button><button type="button" data-v="10">10</button></div></div>
+      <div><span class="seg-lab">Direction</span><div class="seg" id="segDir"><button type="button" data-v="arrow">Flèches</button><button type="button" data-v="deg">Degrés</button></div></div>
+      <div><span class="seg-lab">Nuit</span><div class="seg" id="segNight"><button type="button" data-v="hide">Masquée</button><button type="button" data-v="show">Affichée</button></div></div>
+    </div>
+  </section>
+
+  <div class="viewtabs" id="viewTabs" role="tablist" aria-label="Affichage">
+    <button type="button" role="tab" data-view="fc">Prévisions</button>
+    <button type="button" role="tab" data-view="hist">10 derniers jours</button>
+    <button type="button" role="tab" data-view="meteo">Météo</button>
+    <button type="button" role="tab" data-view="map">Carte</button>
+  </div>
+  <section id="meteoView" hidden><div class="wx-grid" id="wxGrid"></div><p class="pd-hint">Météo Open-Meteo (meilleur modèle disponible pour le spot). Températures en °C, vent en nœuds.</p></section>
+  <section id="mapView" hidden>
+    <div class="map-bar">
+      <div class="seg" id="segLayer"><button type="button" data-v="swell">Houle</button><button type="button" data-v="period">Période</button><button type="button" data-v="wind">Vent</button></div>
+      <div class="seg" id="segZoom"><button type="button" data-z="monde">Monde</button><button type="button" data-z="atlantique">Atlantique</button><button type="button" data-z="basque">Côte basque</button></div>
+    </div>
+    <div class="map-wrap">
+      <div class="map-frame" id="mapFrame"></div>
+      <div class="map-load" id="mapLoad" role="status">Chargement de la carte…</div>
+      <div class="map-legend" id="mapLegend"></div>
+    </div>
+    <div class="map-time">
+      <button class="btn primary" type="button" id="mapPlay" aria-label="Lancer l'animation">▶</button>
+      <input type="range" id="mapSlider" min="0" max="0" value="0" aria-label="Moment de la prévision">
+      <span class="map-when" id="mapWhen">–</span>
+    </div>
+    <p class="pd-hint">Touche la carte pour lire les valeurs à un endroit. Les flèches glissent dans le sens de la houle (ou du vent) : plus elles sont grandes, plus la houle est grosse ; plus elles vont vite, plus la période est longue. Appuie sur ▶ pour voir la houle traverser l'océan sur les 7 prochains jours. <span id="mapStamp"></span> Données Open-Meteo (vagues MFWAM / ECMWF WAM, vent ECMWF), côtes Natural Earth. <a id="windyLink" href="https://www.windy.com" target="_blank" rel="noopener">Comparer sur Windy ↗</a></p>
+  </section>
+  <div id="out"><div class="block"><div class="msg"><b>Chargement des prévisions…</b>Houle, vent et marée depuis Open-Meteo.</div></div></div>
+
+  <section class="legend" id="legend"></section>
+
+  <section class="notes">
+    <p><b>Énergie (kJ)</b> : somme de l'énergie de la houle 1, de la houle 2 et de la mer du vent, chacune calculée par E = ρ·g²·H²·T² / 16π ≈ 1,96 × H² × T² (H = hauteur en m, T = période en s), la même base que la ligne « Swell energy » de <a href="https://www.windguru.cz" target="_blank" rel="noopener">Windguru</a>. Comme <a href="https://www.surfline.com" target="_blank" rel="noopener">Surfline</a>, on tient compte de toutes les houles et pas seulement de la principale : une houle de fond secondaire compte. Repère Surfline : environ 22 kJ pour une petite journée de 2-3 pieds en houle courte. 1 m à 10 s ≈ 200 kJ, 2 m à 14 s ≈ 1 540 kJ. À hauteur égale, une houle longue porte beaucoup plus d'énergie. Pour bien la lire : <a href="https://www.surf-forecast.com/greenroom/how-surf-forecasts-wave-energy-tool-is-like-volume-for-surfboards/" target="_blank" rel="noopener">l'énergie des vagues expliquée par Surf-Forecast</a>. Touche une hauteur de houle dans le tableau pour voir la houle 1, la houle 2 et la mer du vent.</p>
+    <p><b>Marée</b> calculée par analyse harmonique des mesures du marégraphe de Socoa (SHOM, 1990–2026, 54 ondes, cycle lunaire de 18,6 ans inclus). Testée sur 2025–2026, des années non utilisées pour le calcul : heure des PM/BM à 2 min près en médiane, hauteur à 7 cm. Hauteurs en mètres au-dessus du zéro hydrographique, comme dans l'annuaire. S'y ajoute la <b>surcote météo</b> : la mer monte d'environ 1 cm par hPa sous 1013 hPa et baisse au-dessus. Sur les jours de forte dépression, cette correction divise l'erreur par deux.</p>
+    <p><b>Coefficient</b> calculé à partir de la marée astronomique de Brest (marégraphe SHOM, 2000–2026) : marnage / 6,10 m × 100, comme le coefficient officiel. Vérifié sur les grandes marées de 2015 (119), à ±3 environ.</p>
+    <p><b>Houle</b> : modèle GFS-Wave 0,16° (NOAA), le même que Windguru, au large du spot (Météo-France en secours), sans effet de réfraction ni de bathymétrie locale. <b>Vent de synthèse</b> : AROME 1,3 km sur 2 jours, puis ARPEGE, puis ECMWF. <b>Note</b> indicative, calculée depuis l'énergie, la période et le vent par rapport à l'orientation de la plage.</p>
+    <p>Données : Open-Meteo.com (Météo-France, DWD, ECMWF, NOAA), licence CC BY 4.0. Marégraphes : REFMAR / Shom, Licence Ouverte 2.0 (doi:10.17183/REFMAR). Ces prédictions ne sont pas vérifiées par le Shom. <a href="/confidentialite.html">Confidentialité et mentions légales</a>.</p>
+    <p><button type="button" class="linkbtn bicho-open" id="bichoOpen">🦌</button></p>
+  </section>
+  <slot />
+</div>
+
+<dialog class="prefs" id="prefs" aria-labelledby="pdTitle">
+  <div class="pd-head"><h2 id="pdTitle">Personnaliser</h2><button class="btn" type="button" data-close>Fermer</button></div>
+  <div class="pd-body">
+    <section class="pd-sec" id="accSec">
+      <h3>Compte</h3>
+      <form id="accForm">
+        <div class="frow">
+          <label>Email<input type="email" id="accEmail" autocomplete="email" required></label>
+          <label>Mot de passe<input type="password" id="accPass" autocomplete="current-password" minlength="8" required></label>
+        </div>
+        <div class="acc-btns"><button class="btn primary" type="submit">Se connecter</button><button class="btn" type="button" id="accSignup">Créer un compte</button><button class="linkbtn" type="button" id="accForgot">Mot de passe oublié ?</button></div>
+      </form>
+      <form id="accNewPass" hidden>
+        <div class="frow"><label>Nouveau mot de passe<input type="password" id="accNewPw" autocomplete="new-password" minlength="8" required></label></div>
+        <div class="acc-btns"><button class="btn primary" type="submit">Enregistrer le mot de passe</button></div>
+      </form>
+      <div id="accIn" hidden>
+        <p class="acc-who">Connecté : <b id="accMail"></b></p>
+        <div id="accImport"></div>
+        <div class="acc-btns"><button class="btn" type="button" id="accLogout">Se déconnecter</button><button class="btn danger" type="button" id="accDelete">Supprimer mon compte</button></div>
+      </div>
+      <p class="fmsg" id="accMsg" role="status"></p>
+      <p class="pd-hint">Facultatif et gratuit : avec un compte, tes réglages et tes sessions te suivent sur tous tes appareils. Personne d'autre ne peut les voir. Nous mesurons l'utilisation de l'appli de façon anonyme pour l'améliorer. <a href="/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></p>
+    </section>
+    <section class="pd-sec" id="adminSec" hidden>
+      <h3>Administration</h3>
+      <label class="chk"><input type="checkbox" id="admBicho"> Bichomètre activé pour tout le monde</label>
+      <p class="fmsg" id="admMsg" role="status"></p>
+      <p class="pd-hint">Visible uniquement par toi. S'applique à tous les utilisateurs à leur prochaine ouverture d'Olatuak.</p>
+      <div class="acc-btns"><button class="btn" type="button" id="admUsersBtn">Voir les visiteurs</button></div>
+      <div id="admUsers" style="overflow-x:auto"></div>
+    </section>
+    <section class="pd-sec" id="profSec">
+      <h3>Profil sans compte</h3>
+      <div class="profiles" id="profList"></div>
+      <form class="newp" id="newProf"><input id="newName" maxlength="20" placeholder="Nom d'un nouveau profil" aria-label="Nom du nouveau profil"><button class="btn" type="submit">Créer</button></form>
+      <p class="pd-hint">Sans compte, chaque profil garde ses réglages et ses sessions dans ce navigateur uniquement.</p>
+    </section>
+    <section class="pd-sec">
+      <h3>Lignes du tableau</h3>
+      <div class="rowgrid" id="rowChecks"></div>
+    </section>
+    <section class="pd-sec">
+      <h3>Apparence</h3>
+      <div class="seg" id="segTheme"><button type="button" data-v="auto">Comme le téléphone</button><button type="button" data-v="light">Clair</button><button type="button" data-v="dark">Sombre</button></div>
+    </section>
+    <section class="pd-sec">
+      <h3>Blocs détaillés</h3>
+      <div class="rowgrid" id="blockChecks"></div>
+    </section>
+  </div>
+  <div class="pd-foot"><button class="btn danger" type="button" id="delProf">Supprimer ce profil</button><button class="btn" type="button" id="resetProf">Tout réafficher</button></div>
+</dialog>
+
+
+<dialog class="bicho-dlg" id="bichoDlg" aria-labelledby="bkTitle">
+  <div class="bk-head"><h2 id="bkTitle">Bichomètre <small>mode terrain</small></h2><button class="btn" type="button" data-close>Fermer</button></div>
+  <div class="seg bk-tabs" id="bkTabs"><button type="button" data-v="compass">Boussole</button><button type="button" data-v="radar">Radar</button><button type="button" data-v="scan">Scan</button></div>
+  <div class="bk-body">
+    <div class="bk-start" id="bkStart"><p>Active les capteurs du téléphone (boussole, mouvement, son).</p><button class="btn primary" type="button" id="bkGo">Activer les capteurs</button></div>
+    <div class="bk-pane" id="bkCompass" hidden>
+      <div class="bk-dial"><div class="bk-arrow" id="bkArrow">▲</div></div>
+      <p class="bk-heat" id="bkHeat">…</p>
+      <p class="bk-hint" id="bkHint">Tourne sur toi-même, téléphone à plat.</p>
+    </div>
+    <div class="bk-pane" id="bkRadar" hidden><canvas id="bkCanvas" width="320" height="320"></canvas><p class="bk-hint" id="bkRadarTxt">Balayage en cours…</p></div>
+    <div class="bk-pane" id="bkScan" hidden>
+      <p class="bk-hint">Secoue le téléphone pour scanner la zone.</p>
+      <div class="bk-bar"><div id="bkBarFill"></div></div>
+      <p class="bk-step" id="bkStep">&nbsp;</p>
+      <p class="bk-heat" id="bkVerdict">&nbsp;</p>
+      <button class="btn" type="button" id="bkScanBtn">Scanner sans secouer</button>
+    </div>
+    <p class="bk-foot">100 % fictif : aucune position ni personne réelle, tout est tiré au sort.</p>
+  </div>
+</dialog>
+
+<dialog class="prefs" id="spotsDlg" aria-labelledby="spTitle">
+  <div class="pd-head"><h2 id="spTitle">Mes spots</h2><button class="btn" type="button" data-close>Fermer</button></div>
+  <div class="pd-body">
+    <p class="pd-hint">Touche ★ pour mettre un spot en favori : il apparaît en haut de l'écran. Touche le nom d'un spot pour voir ses prévisions.</p>
+    <div class="acc-btns"><button class="btn primary" type="button" id="newSpotBtn">+ Créer ton spot</button></div>
+    <div class="sp-list" id="spotPick"></div>
+  </div>
+</dialog>
+
+<dialog class="prefs" id="newSpotDlg" aria-labelledby="nsTitle">
+  <div class="pd-head"><h2 id="nsTitle">Créer ton spot</h2><button class="btn" type="button" data-close>Fermer</button></div>
+  <div class="pd-body">
+    <p class="pd-hint">1. Touche la carte pour placer ton spot, dans l'eau juste devant le pic. Zoome pour être précis. La zone est limitée au golfe de Gascogne, là où la marée de Socoa reste valable.</p>
+    <div id="nsMap" class="ns-map"></div>
+    <form class="sform" id="nsForm">
+      <p class="pd-hint" id="nsWhere">Aucun point placé.</p>
+      <label class="gl">2. Nom du spot<input id="nsName" maxlength="30" required placeholder="Ex. : Le pic du phare"></label>
+      <label class="gl">Commune<input id="nsTown" maxlength="30" required placeholder="Remplie quand tu places le spot"></label>
+      <p class="pd-hint">3. À toi de dire quelles directions marchent ici (0° = nord, 90° = est, 180° = sud, 270° = ouest). Le vent : celui qui vient de la terre, offshore.</p>
+      <div class="dirgrid">
+        <span>Bonne houle de</span><label><input type="number" id="nsSw0" min="0" max="359" inputmode="numeric" required aria-label="Bonne houle : de (degrés)">°</label><span>à</span><label><input type="number" id="nsSw1" min="0" max="359" inputmode="numeric" required aria-label="Bonne houle : à (degrés)">°</label>
+        <span>Bon vent de</span><label><input type="number" id="nsWi0" min="0" max="359" inputmode="numeric" required aria-label="Bon vent : de (degrés)">°</label><span>à</span><label><input type="number" id="nsWi1" min="0" max="359" inputmode="numeric" required aria-label="Bon vent : à (degrés)">°</label>
+      </div>
+      <p class="fmsg" id="nsMsg" role="status"></p>
+      <div><button class="btn primary" type="submit">Créer le spot</button></div>
+    </form>
+  </div>
+</dialog>
+
+<dialog class="prefs" id="dirDlg" aria-labelledby="dirTitle">
+  <div class="pd-head"><h2 id="dirTitle">Bonnes directions</h2><button class="btn" type="button" data-close>Fermer</button></div>
+  <div class="pd-body">
+    <section class="pd-sec">
+      <div class="dirgrid">
+        <span>Houle venant de</span><label><input type="number" id="dSw0" min="0" max="359" inputmode="numeric" aria-label="Houle : de (degrés)">°</label><span>à</span><label><input type="number" id="dSw1" min="0" max="359" inputmode="numeric" aria-label="Houle : à (degrés)">°</label>
+        <span>Vent venant de</span><label><input type="number" id="dWi0" min="0" max="359" inputmode="numeric" aria-label="Vent : de (degrés)">°</label><span>à</span><label><input type="number" id="dWi1" min="0" max="359" inputmode="numeric" aria-label="Vent : à (degrés)">°</label>
+      </div>
+      <div class="acc-btns"><button class="btn" type="button" id="dirReset">Valeurs par défaut</button></div>
+      <p class="pd-hint">Pour le spot affiché. Sens des aiguilles d'une montre : 0° = nord, 90° = est, 180° = sud, 270° = ouest. Ex. houle 280° à 320° = ouest-nord-ouest à nord-ouest. Ces plages colorent les lignes Direction et comptent dans la note.</p>
+    </section>
+  </div>
+</dialog>
+
+<dialog class="prefs" id="sessDlg" aria-labelledby="sdTitle">
+  <div class="pd-head"><h2 id="sdTitle">Noter une session</h2><button class="btn" type="button" data-close>Fermer</button></div>
+  <div class="pd-body">
+    <form class="sform" id="sessForm">
+      <div class="frow">
+        <label>Spot<select id="sfSpot"></select></label>
+        <label>Date<input type="date" id="sfDate" required></label>
+      </div>
+      <div class="frow">
+        <label>Début<select id="sfStart"></select></label>
+        <label>Fin<select id="sfEnd"></select></label>
+      </div>
+      <div>
+        <div class="seg-lab">Ta note</div>
+        <div class="rate" id="sfRate" role="group" aria-label="Note de 0 à 10"></div>
+        <div class="rate-lab"><span>0 · nul</span><span>10 · parfait</span></div>
+      </div>
+      <div class="frow"><label>Commentaire (facultatif)<textarea id="sfNote" maxlength="200" placeholder="Ex. : fermé à marée haute, super sur la droite"></textarea></label></div>
+      <div class="fmsg" id="sfMsg" role="status"></div>
+      <div><button class="btn primary" type="submit" id="sfSave">Enregistrer la session</button></div>
+    </form>
+    <section class="pd-sec">
+      <h3>Mes sessions</h3>
+      <div class="slist" id="sessList"></div>
+    </section>
+  </div>
+</dialog>
